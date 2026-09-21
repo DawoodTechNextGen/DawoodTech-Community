@@ -1,0 +1,42 @@
+import { Injectable, NotFoundException } from '@nestjs/common';
+import { InjectRepository } from '@nestjs/typeorm';
+import { ILike, Repository } from 'typeorm';
+import { User } from '../database/entities/user.entity.js';
+import type { UpdateProfileDto } from './dto/update-profile.dto.js';
+
+@Injectable()
+export class UsersService {
+  constructor(
+    @InjectRepository(User) private readonly users: Repository<User>,
+  ) {}
+
+  async findByIdOrFail(id: number): Promise<User> {
+    const user = await this.users.findOneBy({ id });
+    if (!user) throw new NotFoundException('User not found');
+    return user;
+  }
+
+  async findByUsernameOrFail(username: string): Promise<User> {
+    const user = await this.users.findOneBy({ username });
+    if (!user) throw new NotFoundException('User not found');
+    return user;
+  }
+
+  async search(query: string): Promise<User[]> {
+    return this.users.find({
+      where: [
+        { username: ILike(`%${query}%`) },
+        { fullName: ILike(`%${query}%`) },
+      ],
+      take: 20,
+    });
+  }
+
+  async updateProfile(id: number, dto: UpdateProfileDto): Promise<User> {
+    const user = await this.findByIdOrFail(id);
+    if (dto.fullName !== undefined) user.fullName = dto.fullName;
+    if (dto.bio !== undefined) user.bio = dto.bio;
+    if (dto.avatarUrl !== undefined) user.avatarUrl = dto.avatarUrl;
+    return this.users.save(user);
+  }
+}
