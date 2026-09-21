@@ -7,7 +7,7 @@ import {
 import { ConfigService } from '@nestjs/config';
 import { JwtService, type JwtSignOptions } from '@nestjs/jwt';
 import { InjectRepository } from '@nestjs/typeorm';
-import * as bcrypt from 'bcrypt';
+import * as bcrypt from 'bcryptjs';
 import { randomUUID } from 'node:crypto';
 import { MoreThan, Repository } from 'typeorm';
 import { MailService } from '../mail/mail.service.js';
