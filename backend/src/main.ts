@@ -27,4 +27,11 @@ async function bootstrap() {
 
   await app.listen(config.get<number>('port') ?? 3000);
 }
-await bootstrap();
+
+// No top-level await: some hosts (cPanel's LiteSpeed lsnode.js launcher)
+// load the entry file with require(), which Node refuses for an ESM
+// module that has top-level await.
+bootstrap().catch((err) => {
+  console.error(err);
+  process.exit(1);
+});

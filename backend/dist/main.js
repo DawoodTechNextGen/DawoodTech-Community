@@ -20,5 +20,8 @@ async function bootstrap() {
     app.useStaticAssets(join(process.cwd(), 'uploads'), { prefix: '/uploads' });
     await app.listen(config.get('port') ?? 3000);
 }
-await bootstrap();
+bootstrap().catch((err) => {
+    console.error(err);
+    process.exit(1);
+});
 //# sourceMappingURL=main.js.map
