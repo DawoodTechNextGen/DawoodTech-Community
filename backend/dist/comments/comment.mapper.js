@@ -1,0 +1,13 @@
+export function toCommentResponse(comment, viewerId) {
+    return {
+        id: comment.id,
+        postId: comment.postId,
+        authorId: comment.userId,
+        authorName: comment.author?.fullName ?? '',
+        authorAvatarUrl: comment.author?.avatarUrl ?? null,
+        content: comment.content,
+        createdAt: comment.createdAt.toISOString(),
+        isOwner: comment.userId === viewerId,
+    };
+}
+//# sourceMappingURL=comment.mapper.js.map

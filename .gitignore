@@ -1,6 +1,7 @@
 # Backend (Node/NestJS)
+# dist/ is intentionally committed — cPanel deploys the compiled output directly,
+# rebuild + commit it whenever backend/src changes (npm run build inside backend/).
 backend/node_modules/
-backend/dist/
 backend/coverage/
 backend/*.tsbuildinfo
 backend/.env*
