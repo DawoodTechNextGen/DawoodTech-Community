@@ -180,16 +180,21 @@ export function ProfileHeader({
                 </button>
               </div>
 
-              <div className="mt-4 flex items-center gap-2">
+              <div className="mt-4 flex flex-wrap items-center gap-2">
                 {isOwnProfile ? (
                   <>
-                    <Button variant="ghost" onClick={() => setEditing(true)}>
+                    <Button
+                      variant="ghost"
+                      className="shrink-0 px-3"
+                      onClick={() => setEditing(true)}
+                    >
                       <Pencil className="h-4 w-4" />
-                      Edit profile
+                      <span className="hidden sm:inline">Edit profile</span>
+                      <span className="sm:hidden">Edit</span>
                     </Button>
                     <Button
                       variant="ghost"
-                      className="md:hidden"
+                      className="shrink-0 px-3 md:hidden"
                       onClick={async () => {
                         await logout();
                         router.replace("/login");
