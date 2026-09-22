@@ -6,6 +6,7 @@ import { LikesService } from '../likes/likes.service.js';
 import { PostMedia } from '../database/entities/post-media.entity.js';
 import { Post } from '../database/entities/post.entity.js';
 import type { CreatePostDto } from './dto/create-post.dto.js';
+import type { UpdatePostDto } from './dto/update-post.dto.js';
 import { type PostResponse } from './post.mapper.js';
 export declare class PostsService {
     private readonly posts;
@@ -26,6 +27,7 @@ export declare class PostsService {
     }>;
     findByUser(userId: number, viewerId?: number): Promise<PostResponse[]>;
     getByIdOrFail(id: number, viewerId?: number): Promise<PostResponse>;
+    updateOwn(id: number, userId: number, dto: UpdatePostDto): Promise<PostResponse>;
     deleteOwn(id: number, userId: number): Promise<void>;
     findPending(): Promise<PostResponse[]>;
     approve(id: number, adminId: number): Promise<PostResponse>;

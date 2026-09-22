@@ -6,12 +6,14 @@ import {
   HttpCode,
   HttpStatus,
   Param,
+  Patch,
   Post as HttpPost,
   Query,
 } from '@nestjs/common';
 import { CurrentUser } from '../common/decorators/current-user.decorator.js';
 import type { AuthenticatedUser } from '../auth/jwt.strategy.js';
 import { CreatePostDto } from './dto/create-post.dto.js';
+import { UpdatePostDto } from './dto/update-post.dto.js';
 import { PostsService } from './posts.service.js';
 
 @Controller('posts')
@@ -48,6 +50,15 @@ export class PostsController {
     @CurrentUser() user: AuthenticatedUser,
   ) {
     return this.posts.getByIdOrFail(Number(id), user.id);
+  }
+
+  @Patch(':id')
+  async update(
+    @Param('id') id: string,
+    @CurrentUser() user: AuthenticatedUser,
+    @Body() dto: UpdatePostDto,
+  ) {
+    return this.posts.updateOwn(Number(id), user.id, dto);
   }
 
   @Delete(':id')

@@ -81,6 +81,14 @@ export function NotificationItem({
     </div>
   );
 
+  if (notification.type === "follow") {
+    return (
+      <Link href={`/profile/${notification.actorId}`} onClick={() => onRead(notification)}>
+        {content}
+      </Link>
+    );
+  }
+
   if (notification.postId) {
     return (
       <Link href={`/post/${notification.postId}`} onClick={() => onRead(notification)}>

@@ -9,6 +9,7 @@ import { PostMedia } from '../database/entities/post-media.entity.js';
 import { Post, PostStatus } from '../database/entities/post.entity.js';
 import { NotificationEvents } from '../notifications/notification.events.js';
 import type { CreatePostDto } from './dto/create-post.dto.js';
+import type { UpdatePostDto } from './dto/update-post.dto.js';
 import { toPostResponse, type PostResponse } from './post.mapper.js';
 
 const PAGE_SIZE = 20;
@@ -141,6 +142,35 @@ export class PostsService {
       viewerId,
     );
     return withEngagement!;
+  }
+
+  /** Editing content sends an already-approved post back through moderation,
+   *  so an edit can't be used to slip unreviewed content past the queue. */
+  async updateOwn(id: number, userId: number, dto: UpdatePostDto): Promise<PostResponse> {
+    const post = await this.posts.findOneBy({ id });
+    if (!post) throw new NotFoundException('Post not found');
+    if (post.userId !== userId) {
+      throw new ForbiddenException('You can only edit your own posts');
+    }
+
+    post.content = dto.content;
+    post.status = PostStatus.PENDING;
+    post.reviewedBy = null;
+    post.reviewedAt = null;
+    await this.posts.save(post);
+
+    if (dto.mediaUrls) {
+      await this.postMedia.delete({ postId: id });
+      if (dto.mediaUrls.length) {
+        await this.postMedia.save(
+          dto.mediaUrls.map((url, index) =>
+            this.postMedia.create({ postId: id, url, sortOrder: index }),
+          ),
+        );
+      }
+    }
+
+    return this.getByIdOrFail(id, userId);
   }
 
   async deleteOwn(id: number, userId: number): Promise<void> {

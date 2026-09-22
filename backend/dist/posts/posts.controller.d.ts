@@ -1,5 +1,6 @@
 import type { AuthenticatedUser } from '../auth/jwt.strategy.js';
 import { CreatePostDto } from './dto/create-post.dto.js';
+import { UpdatePostDto } from './dto/update-post.dto.js';
 import { PostsService } from './posts.service.js';
 export declare class PostsController {
     private readonly posts;
@@ -14,5 +15,6 @@ export declare class PostsController {
         nextCursor: string | null;
     }>;
     getOne(id: string, user: AuthenticatedUser): Promise<import("./post.mapper.js").PostResponse>;
+    update(id: string, user: AuthenticatedUser, dto: UpdatePostDto): Promise<import("./post.mapper.js").PostResponse>;
     remove(id: string, user: AuthenticatedUser): Promise<void>;
 }

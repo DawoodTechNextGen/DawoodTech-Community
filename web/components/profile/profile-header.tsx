@@ -16,6 +16,8 @@ export function ProfileHeader({
   isFollowing,
   onFollowToggle,
   onProfileUpdated,
+  onShowFollowers,
+  onShowFollowing,
 }: {
   profile: PublicUser;
   isOwnProfile: boolean;
@@ -24,6 +26,8 @@ export function ProfileHeader({
   isFollowing: boolean;
   onFollowToggle: () => Promise<void>;
   onProfileUpdated: (updated: PublicUser) => void;
+  onShowFollowers: () => void;
+  onShowFollowing: () => void;
 }) {
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -153,14 +157,14 @@ export function ProfileHeader({
               </p>
 
               <div className="mt-3 flex items-center gap-4 text-sm">
-                <span>
+                <button type="button" onClick={onShowFollowers} className="hover:underline">
                   <strong>{followerCount}</strong>{" "}
                   <span className="text-foreground/50">followers</span>
-                </span>
-                <span>
+                </button>
+                <button type="button" onClick={onShowFollowing} className="hover:underline">
                   <strong>{followingCount}</strong>{" "}
                   <span className="text-foreground/50">following</span>
-                </span>
+                </button>
               </div>
 
               <div className="mt-4">

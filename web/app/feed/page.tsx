@@ -92,6 +92,18 @@ export default function FeedPage() {
     }
   }
 
+  async function handleEdit(post: Post, newContent: string) {
+    try {
+      const updated = await api.updatePost(post.id, {
+        content: newContent,
+        mediaUrls: post.mediaUrls,
+      });
+      setPosts((prev) => prev.map((p) => (p.id === post.id ? updated : p)));
+    } catch {
+      setError("Couldn't save that edit.");
+    }
+  }
+
   if (authLoading || !user) return null;
 
   return (
@@ -156,6 +168,7 @@ export default function FeedPage() {
                 post={post}
                 onToggleLike={toggleLike}
                 onDelete={handleDelete}
+                onEdit={handleEdit}
               />
             ))}
           </div>

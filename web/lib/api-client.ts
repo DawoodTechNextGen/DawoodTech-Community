@@ -191,6 +191,8 @@ export const api = {
   getPost: (id: string) => request<Post>(`/posts/${id}`),
   createPost: (dto: CreatePostInput) =>
     request<Post>("/posts", { method: "POST", body: dto }),
+  updatePost: (id: string, dto: CreatePostInput) =>
+    request<Post>(`/posts/${id}`, { method: "PATCH", body: dto }),
   deletePost: (id: string) => request<void>(`/posts/${id}`, { method: "DELETE" }),
 
   like: (postId: string) => request<{ success: true }>(`/posts/${postId}/like`, { method: "POST" }),

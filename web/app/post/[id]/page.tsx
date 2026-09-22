@@ -91,6 +91,18 @@ export default function PostDetailPage() {
     }
   }
 
+  async function handleEdit(target: Post, newContent: string) {
+    try {
+      const updated = await api.updatePost(target.id, {
+        content: newContent,
+        mediaUrls: target.mediaUrls,
+      });
+      setPost(updated);
+    } catch {
+      setError("Couldn't save that edit.");
+    }
+  }
+
   async function handleAddComment(e: React.FormEvent) {
     e.preventDefault();
     if (!commentText.trim() || !post) return;
@@ -170,7 +182,12 @@ export default function PostDetailPage() {
           </div>
         ) : (
           <>
-            <PostCard post={post} onToggleLike={toggleLike} clickable={false} />
+            <PostCard
+              post={post}
+              onToggleLike={toggleLike}
+              onEdit={post.isOwner ? handleEdit : undefined}
+              clickable={false}
+            />
 
             <div className="space-y-3">
               <h2 className="text-sm font-semibold text-foreground/70">

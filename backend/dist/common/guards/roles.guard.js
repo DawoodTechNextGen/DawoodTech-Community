@@ -7,21 +7,35 @@ var __decorate = (this && this.__decorate) || function (decorators, target, key,
 var __metadata = (this && this.__metadata) || function (k, v) {
     if (typeof Reflect === "object" && typeof Reflect.metadata === "function") return Reflect.metadata(k, v);
 };
+var __param = (this && this.__param) || function (paramIndex, decorator) {
+    return function (target, key) { decorator(target, key, paramIndex); }
+};
 import { ForbiddenException, Injectable } from '@nestjs/common';
 import { Reflector } from '@nestjs/core';
+import { InjectRepository } from '@nestjs/typeorm';
+import { Repository } from 'typeorm';
+import { User, UserStatus } from '../../database/entities/user.entity.js';
 import { ROLES_KEY } from '../decorators/roles.decorator.js';
 let RolesGuard = class RolesGuard {
     reflector;
-    constructor(reflector) {
+    users;
+    constructor(reflector, users) {
         this.reflector = reflector;
+        this.users = users;
     }
-    canActivate(context) {
+    async canActivate(context) {
         const requiredRoles = this.reflector.getAllAndOverride(ROLES_KEY, [context.getHandler(), context.getClass()]);
         if (!requiredRoles || requiredRoles.length === 0)
             return true;
         const request = context.switchToHttp().getRequest();
-        const user = request.user;
-        if (!user || !requiredRoles.includes(user.role)) {
+        const authUser = request.user;
+        if (!authUser) {
+            throw new ForbiddenException('Insufficient role for this action');
+        }
+        const current = await this.users.findOneBy({ id: authUser.id });
+        if (!current ||
+            current.status === UserStatus.DISABLED ||
+            !requiredRoles.includes(current.role)) {
             throw new ForbiddenException('Insufficient role for this action');
         }
         return true;
@@ -29,7 +43,9 @@ let RolesGuard = class RolesGuard {
 };
 RolesGuard = __decorate([
     Injectable(),
-    __metadata("design:paramtypes", [Reflector])
+    __param(1, InjectRepository(User)),
+    __metadata("design:paramtypes", [Reflector,
+        Repository])
 ], RolesGuard);
 export { RolesGuard };
 //# sourceMappingURL=roles.guard.js.map

@@ -1,6 +1,6 @@
 "use client";
 
-import { Heart, MessageCircle, Trash2 } from "lucide-react";
+import { Check, Heart, MessageCircle, Pencil, Trash2, X } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
@@ -22,11 +22,13 @@ export function PostCard({
   post,
   onToggleLike,
   onDelete,
+  onEdit,
   clickable = true,
 }: {
   post: Post;
   onToggleLike: (post: Post) => void;
   onDelete?: (post: Post) => void;
+  onEdit?: (post: Post, newContent: string) => Promise<void>;
   clickable?: boolean;
 }) {
   const router = useRouter();
@@ -35,6 +37,9 @@ export function PostCard({
   const [justLiked, setJustLiked] = useState(false);
   const [lightboxIndex, setLightboxIndex] = useState<number | null>(null);
   const [brokenImages, setBrokenImages] = useState<Set<string>>(new Set());
+  const [editing, setEditing] = useState(false);
+  const [editText, setEditText] = useState(post.content);
+  const [savingEdit, setSavingEdit] = useState(false);
 
   const resolvedMedia = post.mediaUrls.map(resolveMediaUrl);
   const visibleMedia = resolvedMedia.filter((url) => !brokenImages.has(url));
@@ -52,9 +57,20 @@ export function PostCard({
     onToggleLike(post);
   }
 
+  async function handleSaveEdit() {
+    if (!onEdit || !editText.trim()) return;
+    setSavingEdit(true);
+    try {
+      await onEdit(post, editText.trim());
+      setEditing(false);
+    } finally {
+      setSavingEdit(false);
+    }
+  }
+
   return (
     <div
-      onClick={clickable ? () => router.push(`/post/${post.id}`) : undefined}
+      onClick={clickable && !editing ? () => router.push(`/post/${post.id}`) : undefined}
       className={`group rounded-2xl border border-black/5 bg-white/60 p-5 shadow-sm transition-all duration-200 dark:border-white/10 dark:bg-white/5 ${
         clickable
           ? "cursor-pointer hover:-translate-y-0.5 hover:border-brand/20 hover:shadow-lg hover:shadow-black/5"
@@ -84,21 +100,56 @@ export function PostCard({
             {post.status !== "approved" && <StatusBadge status={post.status} />}
           </div>
 
-          <p className="mt-1.5 whitespace-pre-wrap text-[15px] leading-relaxed text-foreground/90">
-            {displayContent}
-            {isLong && (
-              <button
-                type="button"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  setExpanded((v) => !v);
-                }}
-                className="ml-1.5 text-sm font-medium text-brand hover:underline"
-              >
-                {expanded ? "Show less" : "Show more"}
-              </button>
-            )}
-          </p>
+          {editing ? (
+            <div className="mt-1.5 space-y-2" onClick={(e) => e.stopPropagation()}>
+              <textarea
+                value={editText}
+                onChange={(e) => setEditText(e.target.value)}
+                rows={3}
+                maxLength={5000}
+                autoFocus
+                className="w-full resize-none rounded-lg border border-black/10 bg-transparent px-3 py-2 text-[15px] outline-none focus:border-brand focus:ring-2 focus:ring-brand/20 dark:border-white/10"
+              />
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={handleSaveEdit}
+                  disabled={savingEdit || !editText.trim()}
+                  className="flex items-center gap-1.5 rounded-full bg-brand px-3 py-1.5 text-xs font-semibold text-brand-foreground disabled:opacity-60"
+                >
+                  <Check className="h-3.5 w-3.5" />
+                  {savingEdit ? "Saving…" : "Save"}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setEditText(post.content);
+                    setEditing(false);
+                  }}
+                  className="flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-medium text-foreground/60 hover:bg-black/5 dark:hover:bg-white/10"
+                >
+                  <X className="h-3.5 w-3.5" />
+                  Cancel
+                </button>
+              </div>
+            </div>
+          ) : (
+            <p className="mt-1.5 whitespace-pre-wrap text-[15px] leading-relaxed text-foreground/90">
+              {displayContent}
+              {isLong && (
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setExpanded((v) => !v);
+                  }}
+                  className="ml-1.5 text-sm font-medium text-brand hover:underline"
+                >
+                  {expanded ? "Show less" : "Show more"}
+                </button>
+              )}
+            </p>
+          )}
 
           {visibleMedia.length > 0 && (
             <div
@@ -157,27 +208,45 @@ export function PostCard({
               {post.commentCount > 0 && post.commentCount}
             </span>
 
-            {onDelete && post.isOwner && (
-              <button
-                type="button"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  if (confirmingDelete) {
-                    onDelete(post);
-                  } else {
-                    setConfirmingDelete(true);
-                    setTimeout(() => setConfirmingDelete(false), 3000);
-                  }
-                }}
-                className={`ml-auto flex items-center gap-1.5 rounded-full px-2.5 py-1.5 text-xs font-medium transition-colors ${
-                  confirmingDelete
-                    ? "bg-red-500/10 text-red-500"
-                    : "text-foreground/30 opacity-0 hover:bg-red-500/10 hover:text-red-500 group-hover:opacity-100"
-                }`}
-              >
-                <Trash2 className="h-4 w-4" />
-                {confirmingDelete && "Confirm delete?"}
-              </button>
+            {!editing && (onEdit || onDelete) && post.isOwner && (
+              <div className="ml-auto flex items-center gap-1.5">
+                {onEdit && (
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setEditText(post.content);
+                      setEditing(true);
+                    }}
+                    aria-label="Edit post"
+                    className="flex items-center gap-1.5 rounded-full px-2.5 py-1.5 text-xs font-medium text-foreground/30 opacity-0 transition-colors hover:bg-black/5 hover:text-foreground/70 group-hover:opacity-100 dark:hover:bg-white/10"
+                  >
+                    <Pencil className="h-4 w-4" />
+                  </button>
+                )}
+                {onDelete && (
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      if (confirmingDelete) {
+                        onDelete(post);
+                      } else {
+                        setConfirmingDelete(true);
+                        setTimeout(() => setConfirmingDelete(false), 3000);
+                      }
+                    }}
+                    className={`flex items-center gap-1.5 rounded-full px-2.5 py-1.5 text-xs font-medium transition-colors ${
+                      confirmingDelete
+                        ? "bg-red-500/10 text-red-500"
+                        : "text-foreground/30 opacity-0 hover:bg-red-500/10 hover:text-red-500 group-hover:opacity-100"
+                    }`}
+                  >
+                    <Trash2 className="h-4 w-4" />
+                    {confirmingDelete && "Confirm delete?"}
+                  </button>
+                )}
+              </div>
             )}
           </div>
         </div>

@@ -10,9 +10,10 @@ var __metadata = (this && this.__metadata) || function (k, v) {
 var __param = (this && this.__param) || function (paramIndex, decorator) {
     return function (target, key) { decorator(target, key, paramIndex); }
 };
-import { Body, Controller, Delete, Get, HttpCode, HttpStatus, Param, Post as HttpPost, Query, } from '@nestjs/common';
+import { Body, Controller, Delete, Get, HttpCode, HttpStatus, Param, Patch, Post as HttpPost, Query, } from '@nestjs/common';
 import { CurrentUser } from '../common/decorators/current-user.decorator.js';
 import { CreatePostDto } from './dto/create-post.dto.js';
+import { UpdatePostDto } from './dto/update-post.dto.js';
 import { PostsService } from './posts.service.js';
 let PostsController = class PostsController {
     posts;
@@ -30,6 +31,9 @@ let PostsController = class PostsController {
     }
     async getOne(id, user) {
         return this.posts.getByIdOrFail(Number(id), user.id);
+    }
+    async update(id, user, dto) {
+        return this.posts.updateOwn(Number(id), user.id, dto);
     }
     async remove(id, user) {
         await this.posts.deleteOwn(Number(id), user.id);
@@ -67,6 +71,15 @@ __decorate([
     __metadata("design:paramtypes", [String, Object]),
     __metadata("design:returntype", Promise)
 ], PostsController.prototype, "getOne", null);
+__decorate([
+    Patch(':id'),
+    __param(0, Param('id')),
+    __param(1, CurrentUser()),
+    __param(2, Body()),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", [String, Object, UpdatePostDto]),
+    __metadata("design:returntype", Promise)
+], PostsController.prototype, "update", null);
 __decorate([
     Delete(':id'),
     HttpCode(HttpStatus.NO_CONTENT),

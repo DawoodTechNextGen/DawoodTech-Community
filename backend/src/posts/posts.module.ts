@@ -5,13 +5,14 @@ import { FollowsModule } from '../follows/follows.module.js';
 import { LikesModule } from '../likes/likes.module.js';
 import { PostMedia } from '../database/entities/post-media.entity.js';
 import { Post } from '../database/entities/post.entity.js';
+import { User } from '../database/entities/user.entity.js';
 import { AdminPostsController } from './admin-posts.controller.js';
 import { PostsController } from './posts.controller.js';
 import { PostsService } from './posts.service.js';
 
 @Module({
   imports: [
-    TypeOrmModule.forFeature([Post, PostMedia]),
+    TypeOrmModule.forFeature([Post, PostMedia, User]),
     CommentsModule,
     FollowsModule,
     LikesModule,

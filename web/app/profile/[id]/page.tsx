@@ -4,6 +4,7 @@ import { FileText } from "lucide-react";
 import { useParams } from "next/navigation";
 import { useCallback, useEffect, useState } from "react";
 import { AppShell } from "@/components/layout/app-shell";
+import { FollowListModal } from "@/components/profile/follow-list-modal";
 import { ProfileHeader } from "@/components/profile/profile-header";
 import { PostCard } from "@/components/posts/post-card";
 import { PostCardSkeleton } from "@/components/posts/post-card-skeleton";
@@ -25,6 +26,9 @@ export default function ProfilePage() {
   const [isFollowing, setIsFollowing] = useState(false);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [followListType, setFollowListType] = useState<"followers" | "following" | null>(
+    null,
+  );
 
   const isOwnProfile = currentUser?.id === id;
 
@@ -111,6 +115,18 @@ export default function ProfilePage() {
     }
   }
 
+  async function handleEdit(post: Post, newContent: string) {
+    try {
+      const updated = await api.updatePost(post.id, {
+        content: newContent,
+        mediaUrls: post.mediaUrls,
+      });
+      setPosts((prev) => prev.map((p) => (p.id === post.id ? updated : p)));
+    } catch {
+      setError("Couldn't save that edit.");
+    }
+  }
+
   if (authLoading || !currentUser) return null;
 
   return (
@@ -139,6 +155,8 @@ export default function ProfilePage() {
               isFollowing={isFollowing}
               onFollowToggle={handleFollowToggle}
               onProfileUpdated={handleProfileUpdated}
+              onShowFollowers={() => setFollowListType("followers")}
+              onShowFollowing={() => setFollowListType("following")}
             />
           )
         )}
@@ -165,11 +183,23 @@ export default function ProfilePage() {
                 post={post}
                 onToggleLike={toggleLike}
                 onDelete={isOwnProfile ? handleDelete : undefined}
+                onEdit={isOwnProfile ? handleEdit : undefined}
               />
             ))
           )}
         </div>
       </div>
+
+      {followListType && (
+        <FollowListModal
+          userId={id}
+          type={followListType}
+          onClose={() => {
+            setFollowListType(null);
+            load();
+          }}
+        />
+      )}
     </AppShell>
   );
 }
