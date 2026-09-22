@@ -9,3 +9,8 @@ export interface PublicUser {
     role: string;
 }
 export declare function toPublicUser(user: User): PublicUser;
+export interface AdminUserResponse extends PublicUser {
+    status: string;
+    createdAt: string;
+}
+export declare function toAdminUserResponse(user: User): AdminUserResponse;

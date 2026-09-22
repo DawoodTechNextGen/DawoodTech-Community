@@ -1,5 +1,7 @@
 import { tokenStorage } from "./token-storage";
 import type {
+  AccountStatus,
+  AdminUser,
   AuthResponse,
   AuthTokens,
   Comment,
@@ -7,6 +9,7 @@ import type {
   PaginatedPosts,
   Post,
   PublicUser,
+  UserRole,
 } from "./types";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:3000";
@@ -214,6 +217,12 @@ export const api = {
   getPendingPosts: () => request<Post[]>("/admin/posts/pending"),
   approvePost: (id: string) => request<Post>(`/admin/posts/${id}/approve`, { method: "PATCH" }),
   rejectPost: (id: string) => request<Post>(`/admin/posts/${id}/reject`, { method: "PATCH" }),
+
+  getAdminUsers: () => request<AdminUser[]>("/admin/users"),
+  setUserStatus: (id: string, status: AccountStatus) =>
+    request<AdminUser>(`/admin/users/${id}/status`, { method: "PATCH", body: { status } }),
+  setUserRole: (id: string, role: UserRole) =>
+    request<AdminUser>(`/admin/users/${id}/role`, { method: "PATCH", body: { role } }),
 
   getUser: (id: string) => request<PublicUser>(`/users/${id}`),
   getUserPosts: (id: string) => request<Post[]>(`/users/${id}/posts`),

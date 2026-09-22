@@ -4,7 +4,7 @@ import { Loader2 } from "lucide-react";
 
 interface ButtonProps extends React.ButtonHTMLAttributes<HTMLButtonElement> {
   loading?: boolean;
-  variant?: "primary" | "ghost";
+  variant?: "primary" | "ghost" | "danger";
 }
 
 export function Button({
@@ -21,6 +21,7 @@ export function Button({
     primary:
       "bg-brand text-brand-foreground shadow-lg shadow-brand/25 hover:brightness-110 active:scale-[0.98]",
     ghost: "text-foreground/70 hover:bg-black/5 dark:hover:bg-white/5",
+    danger: "bg-red-500/10 text-red-500 hover:bg-red-500/20",
   };
 
   return (

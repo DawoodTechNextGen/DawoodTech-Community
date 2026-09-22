@@ -21,3 +21,16 @@ export function toPublicUser(user: User): PublicUser {
     role: user.role,
   };
 }
+
+export interface AdminUserResponse extends PublicUser {
+  status: string;
+  createdAt: string;
+}
+
+export function toAdminUserResponse(user: User): AdminUserResponse {
+  return {
+    ...toPublicUser(user),
+    status: user.status,
+    createdAt: user.createdAt.toISOString(),
+  };
+}

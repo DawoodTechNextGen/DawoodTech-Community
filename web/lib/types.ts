@@ -12,6 +12,13 @@ export interface PublicUser {
   role: UserRole;
 }
 
+export type AccountStatus = "active" | "disabled";
+
+export interface AdminUser extends PublicUser {
+  status: AccountStatus;
+  createdAt: string;
+}
+
 export interface AuthTokens {
   accessToken: string;
   refreshToken: string;

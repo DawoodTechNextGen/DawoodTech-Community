@@ -9,4 +9,11 @@ export function toPublicUser(user) {
         role: user.role,
     };
 }
+export function toAdminUserResponse(user) {
+    return {
+        ...toPublicUser(user),
+        status: user.status,
+        createdAt: user.createdAt.toISOString(),
+    };
+}
 //# sourceMappingURL=user.mapper.js.map

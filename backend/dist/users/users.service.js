@@ -10,7 +10,7 @@ var __metadata = (this && this.__metadata) || function (k, v) {
 var __param = (this && this.__param) || function (paramIndex, decorator) {
     return function (target, key) { decorator(target, key, paramIndex); }
 };
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { ILike, Repository } from 'typeorm';
 import { User } from '../database/entities/user.entity.js';
@@ -48,6 +48,25 @@ let UsersService = class UsersService {
             user.bio = dto.bio;
         if (dto.avatarUrl !== undefined)
             user.avatarUrl = dto.avatarUrl;
+        return this.users.save(user);
+    }
+    async findAll() {
+        return this.users.find({ order: { createdAt: 'DESC' } });
+    }
+    async setStatus(id, status, actingAdminId) {
+        if (id === actingAdminId) {
+            throw new BadRequestException('You can\'t change your own account status');
+        }
+        const user = await this.findByIdOrFail(id);
+        user.status = status;
+        return this.users.save(user);
+    }
+    async setRole(id, role, actingAdminId) {
+        if (id === actingAdminId) {
+            throw new BadRequestException('You can\'t change your own role');
+        }
+        const user = await this.findByIdOrFail(id);
+        user.role = role;
         return this.users.save(user);
     }
 };

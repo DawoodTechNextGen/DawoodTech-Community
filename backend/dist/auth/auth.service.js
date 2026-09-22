@@ -20,7 +20,7 @@ import { MoreThan, Repository } from 'typeorm';
 import { MailService } from '../mail/mail.service.js';
 import { resetPasswordTemplate, verifyEmailTemplate } from '../mail/templates.js';
 import { RefreshToken } from '../database/entities/refresh-token.entity.js';
-import { User, UserRole } from '../database/entities/user.entity.js';
+import { User, UserRole, UserStatus } from '../database/entities/user.entity.js';
 const BCRYPT_ROUNDS = 12;
 const ACTION_TOKEN_EXPIRES_IN = '1h';
 let AuthService = class AuthService {
@@ -65,6 +65,9 @@ let AuthService = class AuthService {
         }
         if (!user.isEmailVerified) {
             throw new ForbiddenException('EMAIL_NOT_VERIFIED');
+        }
+        if (user.status === UserStatus.DISABLED) {
+            throw new ForbiddenException('ACCOUNT_DISABLED');
         }
         const tokens = await this.issueTokens(user);
         return { user, tokens };
@@ -131,6 +134,9 @@ let AuthService = class AuthService {
         matched.revoked = true;
         await this.refreshTokens.save(matched);
         const user = await this.users.findOneByOrFail({ id: payload.sub });
+        if (user.status === UserStatus.DISABLED) {
+            throw new UnauthorizedException('ACCOUNT_DISABLED');
+        }
         return this.issueTokens(user);
     }
     async logout(refreshToken) {

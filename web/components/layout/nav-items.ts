@@ -1,5 +1,5 @@
 import type { LucideIcon } from "lucide-react";
-import { Bell, Home, ShieldCheck, User } from "lucide-react";
+import { Bell, Home, ShieldCheck, User, Users } from "lucide-react";
 import type { PublicUser } from "@/lib/types";
 
 export interface NavItem {
@@ -33,6 +33,12 @@ export function buildNavItems(
       href: "/admin/review",
       icon: ShieldCheck,
       badge: pendingCount,
+    });
+    items.push({
+      key: "users",
+      label: "Users",
+      href: "/admin/users",
+      icon: Users,
     });
   }
 

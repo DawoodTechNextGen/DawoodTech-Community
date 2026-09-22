@@ -1,7 +1,7 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { ILike, Repository } from 'typeorm';
-import { User } from '../database/entities/user.entity.js';
+import { User, UserRole, UserStatus } from '../database/entities/user.entity.js';
 import type { UpdateProfileDto } from './dto/update-profile.dto.js';
 
 @Injectable()
@@ -37,6 +37,28 @@ export class UsersService {
     if (dto.fullName !== undefined) user.fullName = dto.fullName;
     if (dto.bio !== undefined) user.bio = dto.bio;
     if (dto.avatarUrl !== undefined) user.avatarUrl = dto.avatarUrl;
+    return this.users.save(user);
+  }
+
+  async findAll(): Promise<User[]> {
+    return this.users.find({ order: { createdAt: 'DESC' } });
+  }
+
+  async setStatus(id: number, status: UserStatus, actingAdminId: number): Promise<User> {
+    if (id === actingAdminId) {
+      throw new BadRequestException('You can\'t change your own account status');
+    }
+    const user = await this.findByIdOrFail(id);
+    user.status = status;
+    return this.users.save(user);
+  }
+
+  async setRole(id: number, role: UserRole, actingAdminId: number): Promise<User> {
+    if (id === actingAdminId) {
+      throw new BadRequestException('You can\'t change your own role');
+    }
+    const user = await this.findByIdOrFail(id);
+    user.role = role;
     return this.users.save(user);
   }
 }

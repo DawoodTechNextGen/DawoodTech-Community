@@ -13,7 +13,7 @@ import { MoreThan, Repository } from 'typeorm';
 import { MailService } from '../mail/mail.service.js';
 import { resetPasswordTemplate, verifyEmailTemplate } from '../mail/templates.js';
 import { RefreshToken } from '../database/entities/refresh-token.entity.js';
-import { User, UserRole } from '../database/entities/user.entity.js';
+import { User, UserRole, UserStatus } from '../database/entities/user.entity.js';
 import { LoginDto } from './dto/login.dto.js';
 import { SignupDto } from './dto/signup.dto.js';
 import type { JwtPayload } from './jwt.strategy.js';
@@ -80,6 +80,10 @@ export class AuthService {
 
     if (!user.isEmailVerified) {
       throw new ForbiddenException('EMAIL_NOT_VERIFIED');
+    }
+
+    if (user.status === UserStatus.DISABLED) {
+      throw new ForbiddenException('ACCOUNT_DISABLED');
     }
 
     const tokens = await this.issueTokens(user);
@@ -159,6 +163,9 @@ export class AuthService {
     await this.refreshTokens.save(matched);
 
     const user = await this.users.findOneByOrFail({ id: payload.sub });
+    if (user.status === UserStatus.DISABLED) {
+      throw new UnauthorizedException('ACCOUNT_DISABLED');
+    }
     return this.issueTokens(user);
   }
 

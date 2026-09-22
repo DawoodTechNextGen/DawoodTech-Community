@@ -34,6 +34,8 @@ export default function LoginPage() {
     } catch (err) {
       if (err instanceof ApiError && err.message === "EMAIL_NOT_VERIFIED") {
         setNeedsVerification(true);
+      } else if (err instanceof ApiError && err.message === "ACCOUNT_DISABLED") {
+        setError("Your account has been disabled. Contact an admin for help.");
       } else {
         setError(err instanceof ApiError ? err.message : "Something went wrong. Try again.");
       }
