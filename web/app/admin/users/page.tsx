@@ -121,38 +121,40 @@ export default function AdminUsersPage() {
               return (
                 <div
                   key={u.id}
-                  className="flex flex-wrap items-center gap-3 rounded-2xl border border-black/5 bg-white/60 p-4 shadow-sm dark:border-white/10 dark:bg-white/5"
+                  className="flex flex-col gap-3 rounded-2xl border border-black/5 bg-white/60 p-4 shadow-sm sm:flex-row sm:items-center dark:border-white/10 dark:bg-white/5"
                 >
-                  <Avatar name={u.fullName} src={u.avatarUrl} size={44} />
-                  <div className="min-w-0 flex-1">
-                    <div className="flex flex-wrap items-center gap-2">
-                      <span className="font-semibold">{u.fullName}</span>
-                      <span
-                        className={`rounded-full px-2 py-0.5 text-xs font-medium capitalize ${ROLE_STYLES[u.role]}`}
-                      >
-                        {u.role}
-                      </span>
-                      {u.status === "disabled" && (
-                        <span className="rounded-full bg-red-500/15 px-2 py-0.5 text-xs font-medium text-red-500">
-                          Blocked
+                  <div className="flex min-w-0 items-center gap-3">
+                    <Avatar name={u.fullName} src={u.avatarUrl} size={44} />
+                    <div className="min-w-0 flex-1">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <span className="font-semibold">{u.fullName}</span>
+                        <span
+                          className={`rounded-full px-2 py-0.5 text-xs font-medium capitalize ${ROLE_STYLES[u.role]}`}
+                        >
+                          {u.role}
                         </span>
-                      )}
-                      {isSelf && (
-                        <span className="text-xs text-foreground/40">(you)</span>
-                      )}
+                        {u.status === "disabled" && (
+                          <span className="rounded-full bg-red-500/15 px-2 py-0.5 text-xs font-medium text-red-500">
+                            Blocked
+                          </span>
+                        )}
+                        {isSelf && (
+                          <span className="text-xs text-foreground/40">(you)</span>
+                        )}
+                      </div>
+                      <p className="truncate text-sm text-foreground/50">
+                        @{u.username} · {u.email}
+                      </p>
                     </div>
-                    <p className="truncate text-sm text-foreground/50">
-                      @{u.username} · {u.email}
-                    </p>
                   </div>
 
                   {!isSelf && (
-                    <div className="flex flex-wrap items-center gap-2">
+                    <div className="flex items-center gap-2 sm:ml-auto sm:shrink-0">
                       <select
                         value={u.role}
                         disabled={busyId === u.id}
                         onChange={(e) => changeRole(u, e.target.value as UserRole)}
-                        className="rounded-lg border border-black/10 bg-transparent px-2.5 py-2 text-sm outline-none focus:border-brand focus:ring-2 focus:ring-brand/20 disabled:opacity-60 dark:border-white/10"
+                        className="min-w-0 flex-1 rounded-lg border border-black/10 bg-transparent px-2.5 py-2 text-sm outline-none focus:border-brand focus:ring-2 focus:ring-brand/20 disabled:opacity-60 sm:flex-none dark:border-white/10"
                       >
                         <option value="intern">Intern</option>
                         <option value="supervisor">Supervisor</option>
@@ -163,6 +165,7 @@ export default function AdminUsersPage() {
                         variant={u.status === "active" ? "danger" : "ghost"}
                         loading={busyId === u.id}
                         onClick={() => toggleStatus(u)}
+                        className="shrink-0"
                       >
                         {busyId !== u.id &&
                           (u.status === "active" ? (
