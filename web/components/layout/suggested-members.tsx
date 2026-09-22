@@ -2,43 +2,11 @@
 
 import { UserPlus, Users2 } from "lucide-react";
 import Link from "next/link";
-import { useEffect, useState } from "react";
 import { Avatar } from "@/components/ui/avatar";
-import { api, ApiError } from "@/lib/api-client";
-import type { PublicUser } from "@/lib/types";
+import { useSuggestedMembers } from "@/lib/use-suggested-members";
 
 export function SuggestedMembers() {
-  const [members, setMembers] = useState<PublicUser[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [busyId, setBusyId] = useState<string | null>(null);
-
-  useEffect(() => {
-    let cancelled = false;
-    api
-      .getSuggestedUsers()
-      .then((res) => {
-        if (!cancelled) setMembers(res);
-      })
-      .catch(() => {})
-      .finally(() => {
-        if (!cancelled) setLoading(false);
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, []);
-
-  async function handleFollow(user: PublicUser) {
-    setBusyId(user.id);
-    try {
-      await api.followUser(user.id);
-      setMembers((prev) => prev.filter((m) => m.id !== user.id));
-    } catch (err) {
-      if (!(err instanceof ApiError)) throw err;
-    } finally {
-      setBusyId(null);
-    }
-  }
+  const { members, loading, busyId, follow } = useSuggestedMembers();
 
   if (loading || members.length === 0) return null;
 
@@ -65,7 +33,7 @@ export function SuggestedMembers() {
             </div>
             <button
               type="button"
-              onClick={() => handleFollow(member)}
+              onClick={() => follow(member)}
               disabled={busyId === member.id}
               aria-label={`Follow ${member.fullName}`}
               className="flex shrink-0 items-center gap-1 rounded-full bg-brand/10 px-2.5 py-1.5 text-xs font-semibold text-brand transition-colors hover:bg-brand/20 disabled:opacity-60"

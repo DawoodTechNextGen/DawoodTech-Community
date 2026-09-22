@@ -5,6 +5,7 @@ import { useCallback, useEffect, useState } from "react";
 import { AboutCard } from "@/components/layout/about-card";
 import { AppShell } from "@/components/layout/app-shell";
 import { SuggestedMembers } from "@/components/layout/suggested-members";
+import { SuggestedMembersCarousel } from "@/components/layout/suggested-members-carousel";
 import { CreatePostComposer } from "@/components/posts/create-post-composer";
 import { PostCard } from "@/components/posts/post-card";
 import { PostCardSkeleton } from "@/components/posts/post-card-skeleton";
@@ -120,11 +121,11 @@ export default function FeedPage() {
           ))}
         </div>
 
-        <div className="lg:hidden">
-          <SuggestedMembers />
-        </div>
-
         <CreatePostComposer onSubmitted={() => load(tab)} />
+
+        <div className="lg:hidden">
+          <SuggestedMembersCarousel />
+        </div>
 
         {error && <ErrorBanner message={error} />}
 
