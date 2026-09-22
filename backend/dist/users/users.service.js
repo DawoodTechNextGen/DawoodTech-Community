@@ -13,7 +13,7 @@ var __param = (this && this.__param) || function (paramIndex, decorator) {
 import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { ILike, Repository } from 'typeorm';
-import { User } from '../database/entities/user.entity.js';
+import { User, UserStatus } from '../database/entities/user.entity.js';
 let UsersService = class UsersService {
     users;
     constructor(users) {
@@ -52,6 +52,17 @@ let UsersService = class UsersService {
     }
     async findAll() {
         return this.users.find({ order: { createdAt: 'DESC' } });
+    }
+    async suggestions(excludeIds, limit) {
+        const qb = this.users
+            .createQueryBuilder('user')
+            .where('user.status = :status', { status: UserStatus.ACTIVE })
+            .orderBy('user.createdAt', 'DESC')
+            .take(limit);
+        if (excludeIds.length > 0) {
+            qb.andWhere('user.id NOT IN (:...excludeIds)', { excludeIds });
+        }
+        return qb.getMany();
     }
     async setStatus(id, status, actingAdminId) {
         if (id === actingAdminId) {

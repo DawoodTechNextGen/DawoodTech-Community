@@ -12,21 +12,30 @@ var __param = (this && this.__param) || function (paramIndex, decorator) {
 };
 import { Body, Controller, Get, Param, Patch, Query } from '@nestjs/common';
 import { CurrentUser } from '../common/decorators/current-user.decorator.js';
+import { FollowsService } from '../follows/follows.service.js';
 import { PostsService } from '../posts/posts.service.js';
 import { toPublicUser } from './user.mapper.js';
 import { UpdateProfileDto } from './dto/update-profile.dto.js';
 import { UsersService } from './users.service.js';
+const SUGGESTIONS_LIMIT = 5;
 let UsersController = class UsersController {
     users;
     posts;
-    constructor(users, posts) {
+    follows;
+    constructor(users, posts, follows) {
         this.users = users;
         this.posts = posts;
+        this.follows = follows;
     }
     async search(search) {
         if (!search)
             return [];
         const results = await this.users.search(search);
+        return results.map(toPublicUser);
+    }
+    async suggestions(authUser) {
+        const followedIds = await this.follows.getFollowedIds(authUser.id);
+        const results = await this.users.suggestions([...followedIds, authUser.id], SUGGESTIONS_LIMIT);
         return results.map(toPublicUser);
     }
     async updateMe(authUser, dto) {
@@ -52,6 +61,13 @@ __decorate([
     __metadata("design:paramtypes", [String]),
     __metadata("design:returntype", Promise)
 ], UsersController.prototype, "search", null);
+__decorate([
+    Get('suggestions'),
+    __param(0, CurrentUser()),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", [Object]),
+    __metadata("design:returntype", Promise)
+], UsersController.prototype, "suggestions", null);
 __decorate([
     Patch('me'),
     __param(0, CurrentUser()),
@@ -85,7 +101,8 @@ __decorate([
 UsersController = __decorate([
     Controller('users'),
     __metadata("design:paramtypes", [UsersService,
-        PostsService])
+        PostsService,
+        FollowsService])
 ], UsersController);
 export { UsersController };
 //# sourceMappingURL=users.controller.js.map

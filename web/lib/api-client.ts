@@ -236,4 +236,5 @@ export const api = {
     request<{ isFollowing: boolean }>(`/users/${id}/follow-status`),
   getFollowers: (id: string) => request<PublicUser[]>(`/users/${id}/followers`),
   getFollowing: (id: string) => request<PublicUser[]>(`/users/${id}/following`),
+  getSuggestedUsers: () => request<PublicUser[]>("/users/suggestions"),
 };

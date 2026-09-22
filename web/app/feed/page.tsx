@@ -4,6 +4,7 @@ import { Compass, Users2 } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
 import { AboutCard } from "@/components/layout/about-card";
 import { AppShell } from "@/components/layout/app-shell";
+import { SuggestedMembers } from "@/components/layout/suggested-members";
 import { CreatePostComposer } from "@/components/posts/create-post-composer";
 import { PostCard } from "@/components/posts/post-card";
 import { PostCardSkeleton } from "@/components/posts/post-card-skeleton";
@@ -93,7 +94,14 @@ export default function FeedPage() {
   if (authLoading || !user) return null;
 
   return (
-    <AppShell rightRail={<AboutCard />}>
+    <AppShell
+      rightRail={
+        <>
+          <SuggestedMembers />
+          <AboutCard />
+        </>
+      }
+    >
       <div className="space-y-4">
         <div className="flex gap-1 rounded-xl bg-black/5 p-1 dark:bg-white/5">
           {(["feed", "explore"] as const).map((t) => (
@@ -110,6 +118,10 @@ export default function FeedPage() {
               {t === "feed" ? "For You" : "Explore"}
             </button>
           ))}
+        </div>
+
+        <div className="lg:hidden">
+          <SuggestedMembers />
         </div>
 
         <CreatePostComposer onSubmitted={() => load(tab)} />

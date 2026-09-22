@@ -9,6 +9,7 @@ export declare class UsersService {
     search(query: string): Promise<User[]>;
     updateProfile(id: number, dto: UpdateProfileDto): Promise<User>;
     findAll(): Promise<User[]>;
+    suggestions(excludeIds: number[], limit: number): Promise<User[]>;
     setStatus(id: number, status: UserStatus, actingAdminId: number): Promise<User>;
     setRole(id: number, role: UserRole, actingAdminId: number): Promise<User>;
 }

@@ -44,6 +44,18 @@ export class UsersService {
     return this.users.find({ order: { createdAt: 'DESC' } });
   }
 
+  async suggestions(excludeIds: number[], limit: number): Promise<User[]> {
+    const qb = this.users
+      .createQueryBuilder('user')
+      .where('user.status = :status', { status: UserStatus.ACTIVE })
+      .orderBy('user.createdAt', 'DESC')
+      .take(limit);
+    if (excludeIds.length > 0) {
+      qb.andWhere('user.id NOT IN (:...excludeIds)', { excludeIds });
+    }
+    return qb.getMany();
+  }
+
   async setStatus(id: number, status: UserStatus, actingAdminId: number): Promise<User> {
     if (id === actingAdminId) {
       throw new BadRequestException('You can\'t change your own account status');

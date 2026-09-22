@@ -1,22 +1,36 @@
 import { Body, Controller, Get, Param, Patch, Query } from '@nestjs/common';
 import { CurrentUser } from '../common/decorators/current-user.decorator.js';
 import type { AuthenticatedUser } from '../auth/jwt.strategy.js';
+import { FollowsService } from '../follows/follows.service.js';
 import { PostsService } from '../posts/posts.service.js';
 import { toPublicUser } from './user.mapper.js';
 import { UpdateProfileDto } from './dto/update-profile.dto.js';
 import { UsersService } from './users.service.js';
+
+const SUGGESTIONS_LIMIT = 5;
 
 @Controller('users')
 export class UsersController {
   constructor(
     private readonly users: UsersService,
     private readonly posts: PostsService,
+    private readonly follows: FollowsService,
   ) {}
 
   @Get()
   async search(@Query('search') search?: string) {
     if (!search) return [];
     const results = await this.users.search(search);
+    return results.map(toPublicUser);
+  }
+
+  @Get('suggestions')
+  async suggestions(@CurrentUser() authUser: AuthenticatedUser) {
+    const followedIds = await this.follows.getFollowedIds(authUser.id);
+    const results = await this.users.suggestions(
+      [...followedIds, authUser.id],
+      SUGGESTIONS_LIMIT,
+    );
     return results.map(toPublicUser);
   }
 
