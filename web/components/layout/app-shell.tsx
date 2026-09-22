@@ -4,6 +4,7 @@ import Image from "next/image";
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { api } from "@/lib/api-client";
+import { syncAppBadge } from "@/lib/app-badge";
 import { useAuth } from "@/lib/auth-context";
 import { BottomNav } from "./bottom-nav";
 import { Sidebar } from "./sidebar";
@@ -29,7 +30,10 @@ export function AppShell({
     async function poll() {
       try {
         const { count } = await api.getUnreadCount();
-        if (!cancelled) setUnreadCount(count);
+        if (!cancelled) {
+          setUnreadCount(count);
+          syncAppBadge(count);
+        }
       } catch {
         // silent — the badge just won't update this cycle
       }

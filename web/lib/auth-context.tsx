@@ -2,6 +2,7 @@
 
 import { createContext, useCallback, useContext, useEffect, useState } from "react";
 import { api, type LoginInput, type SignupInput } from "./api-client";
+import { syncAppBadge } from "./app-badge";
 import { tokenStorage } from "./token-storage";
 import type { PublicUser } from "./types";
 
@@ -58,6 +59,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const logout = useCallback(async () => {
     await api.logout();
     setUser(null);
+    syncAppBadge(0);
   }, []);
 
   const updateUser = useCallback((updated: PublicUser) => {
