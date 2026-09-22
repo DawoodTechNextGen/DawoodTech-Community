@@ -1,11 +1,22 @@
 "use client";
 
-import { Camera, Check, Loader2, Pencil, UserMinus, UserPlus, X } from "lucide-react";
+import {
+  Camera,
+  Check,
+  Loader2,
+  LogOut,
+  Pencil,
+  UserMinus,
+  UserPlus,
+  X,
+} from "lucide-react";
+import { useRouter } from "next/navigation";
 import { useRef, useState } from "react";
 import { Avatar } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import { ErrorBanner } from "@/components/ui/error-banner";
 import { api, ApiError } from "@/lib/api-client";
+import { useAuth } from "@/lib/auth-context";
 import type { PublicUser } from "@/lib/types";
 
 export function ProfileHeader({
@@ -30,6 +41,8 @@ export function ProfileHeader({
   onShowFollowing: () => void;
 }) {
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const { logout } = useAuth();
+  const router = useRouter();
 
   const [editing, setEditing] = useState(false);
   const [fullName, setFullName] = useState(profile.fullName);
@@ -167,12 +180,25 @@ export function ProfileHeader({
                 </button>
               </div>
 
-              <div className="mt-4">
+              <div className="mt-4 flex items-center gap-2">
                 {isOwnProfile ? (
-                  <Button variant="ghost" onClick={() => setEditing(true)}>
-                    <Pencil className="h-4 w-4" />
-                    Edit profile
-                  </Button>
+                  <>
+                    <Button variant="ghost" onClick={() => setEditing(true)}>
+                      <Pencil className="h-4 w-4" />
+                      Edit profile
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      className="md:hidden"
+                      onClick={async () => {
+                        await logout();
+                        router.replace("/login");
+                      }}
+                    >
+                      <LogOut className="h-4 w-4" />
+                      Log out
+                    </Button>
+                  </>
                 ) : (
                   <Button
                     loading={followBusy}

@@ -219,7 +219,7 @@ export function PostCard({
                       setEditing(true);
                     }}
                     aria-label="Edit post"
-                    className="flex items-center gap-1.5 rounded-full px-2.5 py-1.5 text-xs font-medium text-foreground/30 opacity-0 transition-colors hover:bg-black/5 hover:text-foreground/70 group-hover:opacity-100 dark:hover:bg-white/10"
+                    className="flex items-center gap-1.5 rounded-full px-2.5 py-1.5 text-xs font-medium text-foreground/40 transition-colors hover:bg-black/5 hover:text-foreground/70 md:opacity-0 md:group-hover:opacity-100 dark:hover:bg-white/10"
                   >
                     <Pencil className="h-4 w-4" />
                   </button>
@@ -239,7 +239,7 @@ export function PostCard({
                     className={`flex items-center gap-1.5 rounded-full px-2.5 py-1.5 text-xs font-medium transition-colors ${
                       confirmingDelete
                         ? "bg-red-500/10 text-red-500"
-                        : "text-foreground/30 opacity-0 hover:bg-red-500/10 hover:text-red-500 group-hover:opacity-100"
+                        : "text-foreground/40 hover:bg-red-500/10 hover:text-red-500 md:opacity-0 md:group-hover:opacity-100"
                     }`}
                   >
                     <Trash2 className="h-4 w-4" />
