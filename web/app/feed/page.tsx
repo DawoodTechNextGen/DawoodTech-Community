@@ -110,8 +110,8 @@ export default function FeedPage() {
     <AppShell
       rightRail={
         <>
-          <SuggestedMembers />
           <AboutCard />
+          <SuggestedMembers />
         </>
       }
     >
