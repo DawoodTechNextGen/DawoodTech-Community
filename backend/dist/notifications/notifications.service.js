@@ -28,6 +28,11 @@ let NotificationsService = class NotificationsService {
             return;
         await this.record(postOwnerId, actorId, NotificationType.COMMENT, postId);
     }
+    async handleReplyCreated({ postId, parentCommentAuthorId, actorId }) {
+        if (parentCommentAuthorId === actorId)
+            return;
+        await this.record(parentCommentAuthorId, actorId, NotificationType.REPLY, postId);
+    }
     async handleLikeCreated({ postId, postOwnerId, actorId }) {
         if (postOwnerId === actorId)
             return;
@@ -92,6 +97,12 @@ __decorate([
     __metadata("design:paramtypes", [Object]),
     __metadata("design:returntype", Promise)
 ], NotificationsService.prototype, "handleCommentCreated", null);
+__decorate([
+    OnEvent(NotificationEvents.ReplyCreated),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", [Object]),
+    __metadata("design:returntype", Promise)
+], NotificationsService.prototype, "handleReplyCreated", null);
 __decorate([
     OnEvent(NotificationEvents.LikeCreated),
     __metadata("design:type", Function),

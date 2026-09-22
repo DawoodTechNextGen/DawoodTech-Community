@@ -41,6 +41,7 @@ DatabaseModule = __decorate([
                         Notification,
                     ],
                     synchronize: config.get('nodeEnv') !== 'production',
+                    charset: 'utf8mb4',
                     extra: { connectionLimit: 10 },
                 }),
             }),

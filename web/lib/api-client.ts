@@ -194,8 +194,11 @@ export const api = {
   unlike: (postId: string) => request<void>(`/posts/${postId}/like`, { method: "DELETE" }),
 
   getComments: (postId: string) => request<Comment[]>(`/posts/${postId}/comments`),
-  createComment: (postId: string, content: string) =>
-    request<Comment>(`/posts/${postId}/comments`, { method: "POST", body: { content } }),
+  createComment: (postId: string, content: string, parentId?: string) =>
+    request<Comment>(`/posts/${postId}/comments`, {
+      method: "POST",
+      body: parentId ? { content, parentId: Number(parentId) } : { content },
+    }),
   deleteComment: (id: string) => request<void>(`/comments/${id}`, { method: "DELETE" }),
 
   getNotifications: (cursor?: string) =>

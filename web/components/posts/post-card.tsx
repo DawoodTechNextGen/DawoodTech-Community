@@ -5,11 +5,18 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { Avatar } from "@/components/ui/avatar";
+import { Lightbox } from "@/components/ui/lightbox";
 import { StatusBadge } from "@/components/ui/status-badge";
 import { formatRelativeTime } from "@/lib/format";
 import type { Post } from "@/lib/types";
 
 const TRUNCATE_AT = 260;
+
+function resolveMediaUrl(url: string): string {
+  return url.startsWith("http")
+    ? url
+    : `${process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:3000"}${url}`;
+}
 
 export function PostCard({
   post,
@@ -26,6 +33,11 @@ export function PostCard({
   const [confirmingDelete, setConfirmingDelete] = useState(false);
   const [expanded, setExpanded] = useState(false);
   const [justLiked, setJustLiked] = useState(false);
+  const [lightboxIndex, setLightboxIndex] = useState<number | null>(null);
+  const [brokenImages, setBrokenImages] = useState<Set<string>>(new Set());
+
+  const resolvedMedia = post.mediaUrls.map(resolveMediaUrl);
+  const visibleMedia = resolvedMedia.filter((url) => !brokenImages.has(url));
 
   const isLong = post.content.length > TRUNCATE_AT;
   const displayContent =
@@ -88,28 +100,40 @@ export function PostCard({
             )}
           </p>
 
-          {post.mediaUrls.length > 0 && (
+          {visibleMedia.length > 0 && (
             <div
               className={`mt-3 grid gap-1.5 overflow-hidden rounded-xl ${
-                post.mediaUrls.length === 1 ? "grid-cols-1" : "grid-cols-2"
+                visibleMedia.length === 1 ? "grid-cols-1" : "grid-cols-2"
               }`}
             >
-              {post.mediaUrls.map((url) => (
+              {visibleMedia.map((url, i) => (
                 // eslint-disable-next-line @next/next/no-img-element
                 <img
                   key={url}
-                  src={
-                    url.startsWith("http")
-                      ? url
-                      : `${process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:3000"}${url}`
-                  }
+                  src={url}
                   alt=""
-                  className={`w-full object-cover transition-transform duration-300 hover:scale-[1.02] ${
-                    post.mediaUrls.length === 1 ? "max-h-[420px]" : "aspect-square"
+                  loading="lazy"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setLightboxIndex(i);
+                  }}
+                  onError={() =>
+                    setBrokenImages((prev) => new Set(prev).add(url))
+                  }
+                  className={`w-full cursor-zoom-in object-cover transition-transform duration-300 hover:scale-[1.02] ${
+                    visibleMedia.length === 1 ? "max-h-[420px]" : "aspect-square"
                   }`}
                 />
               ))}
             </div>
+          )}
+
+          {lightboxIndex !== null && (
+            <Lightbox
+              images={visibleMedia}
+              startIndex={lightboxIndex}
+              onClose={() => setLightboxIndex(null)}
+            />
           )}
 
           <div className="mt-3.5 flex items-center gap-1.5">

@@ -8,5 +8,7 @@ export declare class Comment {
     userId: number;
     author: Relation<User>;
     content: string;
+    parentId: number | null;
+    parent: Relation<Comment> | null;
     createdAt: Date;
 }

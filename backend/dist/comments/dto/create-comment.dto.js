@@ -7,9 +7,11 @@ var __decorate = (this && this.__decorate) || function (decorators, target, key,
 var __metadata = (this && this.__metadata) || function (k, v) {
     if (typeof Reflect === "object" && typeof Reflect.metadata === "function") return Reflect.metadata(k, v);
 };
-import { IsString, MaxLength, MinLength } from 'class-validator';
+import { IsInt, IsOptional, IsString, MaxLength, MinLength } from 'class-validator';
+import { Type } from 'class-transformer';
 export class CreateCommentDto {
     content;
+    parentId;
 }
 __decorate([
     IsString(),
@@ -17,4 +19,10 @@ __decorate([
     MaxLength(1000),
     __metadata("design:type", String)
 ], CreateCommentDto.prototype, "content", void 0);
+__decorate([
+    IsOptional(),
+    Type(() => Number),
+    IsInt(),
+    __metadata("design:type", Number)
+], CreateCommentDto.prototype, "parentId", void 0);
 //# sourceMappingURL=create-comment.dto.js.map

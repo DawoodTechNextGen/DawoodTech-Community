@@ -46,6 +46,7 @@ export interface PaginatedPosts {
 export interface Comment {
   id: string;
   postId: string;
+  parentId: string | null;
   authorId: string;
   authorName: string;
   authorAvatarUrl: string | null;
@@ -56,6 +57,7 @@ export interface Comment {
 
 export type NotificationType =
   | "comment"
+  | "reply"
   | "follow"
   | "like"
   | "post_approved"

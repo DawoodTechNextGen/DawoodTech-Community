@@ -17,6 +17,8 @@ let Comment = class Comment {
     userId;
     author;
     content;
+    parentId;
+    parent;
     createdAt;
 };
 __decorate([
@@ -47,6 +49,16 @@ __decorate([
     Column({ type: 'varchar', length: 1000 }),
     __metadata("design:type", String)
 ], Comment.prototype, "content", void 0);
+__decorate([
+    Index(),
+    Column({ name: 'parent_id', type: 'bigint', nullable: true }),
+    __metadata("design:type", Object)
+], Comment.prototype, "parentId", void 0);
+__decorate([
+    ManyToOne(() => Comment, { onDelete: 'CASCADE', nullable: true }),
+    JoinColumn({ name: 'parent_id' }),
+    __metadata("design:type", Object)
+], Comment.prototype, "parent", void 0);
 __decorate([
     CreateDateColumn({ name: 'created_at' }),
     __metadata("design:type", Date)

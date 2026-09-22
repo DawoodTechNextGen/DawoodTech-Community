@@ -1,5 +1,6 @@
 export declare const NotificationEvents: {
     readonly CommentCreated: "comment.created";
+    readonly ReplyCreated: "reply.created";
     readonly FollowCreated: "follow.created";
     readonly LikeCreated: "like.created";
     readonly PostApproved: "post.approved";
@@ -8,6 +9,11 @@ export declare const NotificationEvents: {
 export interface CommentCreatedEvent {
     postId: number;
     postOwnerId: number;
+    actorId: number;
+}
+export interface ReplyCreatedEvent {
+    postId: number;
+    parentCommentAuthorId: number;
     actorId: number;
 }
 export interface FollowCreatedEvent {

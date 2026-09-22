@@ -1,5 +1,6 @@
 export const NotificationEvents = {
   CommentCreated: 'comment.created',
+  ReplyCreated: 'reply.created',
   FollowCreated: 'follow.created',
   LikeCreated: 'like.created',
   PostApproved: 'post.approved',
@@ -9,6 +10,12 @@ export const NotificationEvents = {
 export interface CommentCreatedEvent {
   postId: number;
   postOwnerId: number;
+  actorId: number;
+}
+
+export interface ReplyCreatedEvent {
+  postId: number;
+  parentCommentAuthorId: number;
   actorId: number;
 }
 

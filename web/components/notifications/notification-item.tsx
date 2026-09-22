@@ -1,4 +1,4 @@
-import { CheckCircle2, Heart, MessageCircle, UserPlus, XCircle } from "lucide-react";
+import { CheckCircle2, Heart, MessageCircle, Reply, UserPlus, XCircle } from "lucide-react";
 import Link from "next/link";
 import { Avatar } from "@/components/ui/avatar";
 import { formatRelativeTime } from "@/lib/format";
@@ -6,6 +6,7 @@ import type { Notification, NotificationType } from "@/lib/types";
 
 const ICONS: Record<NotificationType, typeof Heart> = {
   comment: MessageCircle,
+  reply: Reply,
   follow: UserPlus,
   like: Heart,
   post_approved: CheckCircle2,
@@ -14,6 +15,7 @@ const ICONS: Record<NotificationType, typeof Heart> = {
 
 const ICON_COLORS: Record<NotificationType, string> = {
   comment: "text-sky-500",
+  reply: "text-sky-500",
   follow: "text-violet-500",
   like: "text-rose-500",
   post_approved: "text-emerald-500",
@@ -24,6 +26,8 @@ function messageFor(n: Notification): string {
   switch (n.type) {
     case "comment":
       return "commented on your post";
+    case "reply":
+      return "replied to your comment";
     case "follow":
       return "started following you";
     case "like":

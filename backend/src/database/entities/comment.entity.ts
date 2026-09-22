@@ -35,6 +35,14 @@ export class Comment {
   @Column({ type: 'varchar', length: 1000 })
   content!: string;
 
+  @Index()
+  @Column({ name: 'parent_id', type: 'bigint', nullable: true })
+  parentId!: number | null;
+
+  @ManyToOne(() => Comment, { onDelete: 'CASCADE', nullable: true })
+  @JoinColumn({ name: 'parent_id' })
+  parent!: Relation<Comment> | null;
+
   @CreateDateColumn({ name: 'created_at' })
   createdAt!: Date;
 }

@@ -9,6 +9,7 @@ import {
 import {
   NotificationEvents,
   type CommentCreatedEvent,
+  type ReplyCreatedEvent,
   type FollowCreatedEvent,
   type LikeCreatedEvent,
   type PostReviewedEvent,
@@ -28,6 +29,12 @@ export class NotificationsService {
   async handleCommentCreated({ postId, postOwnerId, actorId }: CommentCreatedEvent) {
     if (postOwnerId === actorId) return;
     await this.record(postOwnerId, actorId, NotificationType.COMMENT, postId);
+  }
+
+  @OnEvent(NotificationEvents.ReplyCreated)
+  async handleReplyCreated({ postId, parentCommentAuthorId, actorId }: ReplyCreatedEvent) {
+    if (parentCommentAuthorId === actorId) return;
+    await this.record(parentCommentAuthorId, actorId, NotificationType.REPLY, postId);
   }
 
   @OnEvent(NotificationEvents.LikeCreated)

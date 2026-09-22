@@ -2,6 +2,7 @@ import type { Comment } from '../database/entities/comment.entity.js';
 export interface CommentResponse {
     id: number;
     postId: number;
+    parentId: number | null;
     authorId: number;
     authorName: string;
     authorAvatarUrl: string | null;

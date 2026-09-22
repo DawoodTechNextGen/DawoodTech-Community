@@ -2,6 +2,7 @@ export function toCommentResponse(comment, viewerId) {
     return {
         id: comment.id,
         postId: comment.postId,
+        parentId: comment.parentId,
         authorId: comment.userId,
         authorName: comment.author?.fullName ?? '',
         authorAvatarUrl: comment.author?.avatarUrl ?? null,

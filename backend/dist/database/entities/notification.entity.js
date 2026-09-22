@@ -13,6 +13,7 @@ import { User } from './user.entity.js';
 export var NotificationType;
 (function (NotificationType) {
     NotificationType["COMMENT"] = "comment";
+    NotificationType["REPLY"] = "reply";
     NotificationType["FOLLOW"] = "follow";
     NotificationType["LIKE"] = "like";
     NotificationType["POST_APPROVED"] = "post_approved";

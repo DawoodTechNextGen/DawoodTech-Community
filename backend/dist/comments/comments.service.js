@@ -32,16 +32,36 @@ let CommentsService = class CommentsService {
         if (!post || post.status !== PostStatus.APPROVED) {
             throw new NotFoundException('Post not found');
         }
-        const comment = await this.comments.save(this.comments.create({ postId, userId, content: dto.content }));
+        let parent = null;
+        if (dto.parentId != null) {
+            parent = await this.comments.findOneBy({ id: dto.parentId, postId });
+            if (!parent)
+                throw new NotFoundException('Comment being replied to was not found');
+        }
+        const comment = await this.comments.save(this.comments.create({
+            postId,
+            userId,
+            content: dto.content,
+            parentId: parent?.id ?? null,
+        }));
         const withAuthor = await this.comments.findOneOrFail({
             where: { id: comment.id },
             relations: { author: true },
         });
-        this.events.emit(NotificationEvents.CommentCreated, {
-            postId,
-            postOwnerId: post.userId,
-            actorId: userId,
-        });
+        if (parent) {
+            this.events.emit(NotificationEvents.ReplyCreated, {
+                postId,
+                parentCommentAuthorId: parent.userId,
+                actorId: userId,
+            });
+        }
+        if (!parent || parent.userId !== post.userId) {
+            this.events.emit(NotificationEvents.CommentCreated, {
+                postId,
+                postOwnerId: post.userId,
+                actorId: userId,
+            });
+        }
         return toCommentResponse(withAuthor, userId);
     }
     async findByPost(postId, viewerId) {

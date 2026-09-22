@@ -3,6 +3,7 @@ import type { Comment } from '../database/entities/comment.entity.js';
 export interface CommentResponse {
   id: number;
   postId: number;
+  parentId: number | null;
   authorId: number;
   authorName: string;
   authorAvatarUrl: string | null;
@@ -18,6 +19,7 @@ export function toCommentResponse(
   return {
     id: comment.id,
     postId: comment.postId,
+    parentId: comment.parentId,
     authorId: comment.userId,
     authorName: comment.author?.fullName ?? '',
     authorAvatarUrl: comment.author?.avatarUrl ?? null,

@@ -13,6 +13,7 @@ import { User } from './user.entity.js';
 
 export enum NotificationType {
   COMMENT = 'comment',
+  REPLY = 'reply',
   FOLLOW = 'follow',
   LIKE = 'like',
   POST_APPROVED = 'post_approved',

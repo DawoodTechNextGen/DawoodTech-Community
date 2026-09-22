@@ -33,6 +33,7 @@ import { Notification } from './entities/notification.entity.js';
           Notification,
         ],
         synchronize: config.get<string>('nodeEnv') !== 'production',
+        charset: 'utf8mb4',
         extra: { connectionLimit: 10 },
       }),
     }),
