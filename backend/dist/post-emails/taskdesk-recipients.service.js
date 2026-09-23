@@ -14,6 +14,8 @@ import { isEmail } from 'class-validator';
 import mysql from 'mysql2/promise';
 import { normalizeEmail } from './email-worker-utils.js';
 const INTERN_ROLES = [2, 6];
+const ACTIVE_USER_STATUS = 1;
+const HIRED_REGISTRATION_STATUS = 'hire';
 let TaskdeskRecipientsService = TaskdeskRecipientsService_1 = class TaskdeskRecipientsService {
     config;
     logger = new Logger(TaskdeskRecipientsService_1.name);
@@ -33,9 +35,9 @@ let TaskdeskRecipientsService = TaskdeskRecipientsService_1 = class TaskdeskReci
         return this.pool;
     }
     async fetchRecipients() {
-        const [rows] = await this.getPool().query(`SELECT name, email FROM registrations
+        const [rows] = await this.getPool().query(`SELECT name, email FROM registrations WHERE status = ?
        UNION ALL
-       SELECT name, email FROM users WHERE user_role IN (?)`, [INTERN_ROLES]);
+       SELECT name, email FROM users WHERE user_role IN (?) AND status = ?`, [HIRED_REGISTRATION_STATUS, INTERN_ROLES, ACTIVE_USER_STATUS]);
         return dedupeRecipients(rows);
     }
     async onModuleDestroy() {

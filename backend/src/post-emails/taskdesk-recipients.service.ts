@@ -11,6 +11,9 @@ export interface Recipient {
 
 // TaskDesk user_role values that count as interns: 2 = intern, 6 = candidate.
 const INTERN_ROLES = [2, 6];
+// TaskDesk users.status 1 = active; registrations.status 'hire' = hired.
+const ACTIVE_USER_STATUS = 1;
+const HIRED_REGISTRATION_STATUS = 'hire';
 
 /** Reads intern emails out of TaskDesk's database. Strictly read-only —
  *  only SELECTs are ever issued, and a SELECT-only MySQL user is recommended. */
@@ -33,14 +36,16 @@ export class TaskdeskRecipientsService implements OnModuleDestroy {
     return this.pool;
   }
 
-  /** Everyone who registered for an internship (any status), plus TaskDesk
-   *  intern/candidate accounts — de-duplicated by trimmed, lowercased email. */
+  /** Active TaskDesk intern/candidate accounts plus hired registrations —
+   *  de-duplicated by trimmed, lowercased email. New, rejected and other
+   *  registrations are left out: many of those addresses bounce, and cPanel
+   *  blocks all of the domain's mail for an hour after a handful of bounces. */
   async fetchRecipients(): Promise<Recipient[]> {
     const [rows] = await this.getPool().query<RowDataPacket[]>(
-      `SELECT name, email FROM registrations
+      `SELECT name, email FROM registrations WHERE status = ?
        UNION ALL
-       SELECT name, email FROM users WHERE user_role IN (?)`,
-      [INTERN_ROLES],
+       SELECT name, email FROM users WHERE user_role IN (?) AND status = ?`,
+      [HIRED_REGISTRATION_STATUS, INTERN_ROLES, ACTIVE_USER_STATUS],
     );
     return dedupeRecipients(rows as { name: string | null; email: string | null }[]);
   }
