@@ -16,7 +16,7 @@ export function SuggestedMembers() {
         <Users2 className="h-4 w-4 text-brand" />
         <h2 className="text-sm font-semibold">People to follow</h2>
       </div>
-      <ul className="max-h-[45vh] divide-y divide-black/5 overflow-y-auto dark:divide-white/10">
+      <ul className="scrollbar-subtle max-h-[45vh] divide-y divide-black/5 overflow-y-auto dark:divide-white/10">
         {members.map((member) => (
           <li key={member.id} className="flex items-center gap-3 px-5 py-3">
             <Link href={`/profile/${member.id}`} className="shrink-0">
