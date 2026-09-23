@@ -15,6 +15,10 @@ import { Comment } from './entities/comment.entity.js';
 import { Follow } from './entities/follow.entity.js';
 import { Like } from './entities/like.entity.js';
 import { Notification } from './entities/notification.entity.js';
+import { PostEmailQueue } from './entities/post-email-queue.entity.js';
+import { PostEmailNotifications1790136000000 } from './migrations/1790136000000-PostEmailNotifications.js';
+import { ActivityEmails1790200000000 } from './migrations/1790200000000-ActivityEmails.js';
+import { ActivityEmailQueue } from './entities/activity-email-queue.entity.js';
 let DatabaseModule = class DatabaseModule {
 };
 DatabaseModule = __decorate([
@@ -39,8 +43,12 @@ DatabaseModule = __decorate([
                         Follow,
                         Like,
                         Notification,
+                        PostEmailQueue,
+                        ActivityEmailQueue,
                     ],
                     synchronize: config.get('nodeEnv') !== 'production',
+                    migrations: [PostEmailNotifications1790136000000, ActivityEmails1790200000000],
+                    migrationsRun: true,
                     charset: 'utf8mb4',
                     extra: { connectionLimit: 10 },
                 }),

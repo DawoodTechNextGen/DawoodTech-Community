@@ -5,6 +5,7 @@ export declare const NotificationEvents: {
     readonly LikeCreated: "like.created";
     readonly PostApproved: "post.approved";
     readonly PostRejected: "post.rejected";
+    readonly CommentPosted: "comment.posted";
 };
 export interface CommentCreatedEvent {
     postId: number;
@@ -29,4 +30,11 @@ export interface PostReviewedEvent {
     postId: number;
     authorId: number;
     adminId: number;
+}
+export interface CommentPostedEvent {
+    postId: number;
+    commentId: number;
+    postOwnerId: number;
+    parentCommentAuthorId: number | null;
+    actorId: number;
 }

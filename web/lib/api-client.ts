@@ -7,6 +7,7 @@ import type {
   Comment,
   PaginatedNotifications,
   PaginatedPosts,
+  PostEmailStatsResponse,
   Post,
   PublicUser,
   UserRole,
@@ -217,8 +218,10 @@ export const api = {
     request<{ success: true }>("/notifications/read-all", { method: "PATCH" }),
 
   getPendingPosts: () => request<Post[]>("/admin/posts/pending"),
-  approvePost: (id: string) => request<Post>(`/admin/posts/${id}/approve`, { method: "PATCH" }),
+  approvePost: (id: string, notifyInterns: boolean) =>
+    request<Post>(`/admin/posts/${id}/approve`, { method: "PATCH", body: { notifyInterns } }),
   rejectPost: (id: string) => request<Post>(`/admin/posts/${id}/reject`, { method: "PATCH" }),
+  getPostEmailStats: () => request<PostEmailStatsResponse>("/admin/post-emails/stats"),
 
   getAdminUsers: () => request<AdminUser[]>("/admin/users"),
   setUserStatus: (id: string, status: AccountStatus) =>

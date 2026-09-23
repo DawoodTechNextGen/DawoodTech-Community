@@ -32,13 +32,19 @@ let MailService = MailService_1 = class MailService {
             })
             : null;
     }
-    async send({ to, subject, html }) {
+    get isConfigured() {
+        return this.transporter !== null;
+    }
+    async send({ to, subject, html, text, headers }) {
         if (!this.transporter) {
             this.logger.warn(`SMTP not configured — logging email instead of sending.\n` +
-                `To: ${to}\nSubject: ${subject}\n${stripHtml(html)}\n`);
+                `To: ${to}\nSubject: ${subject}\n${text ?? stripHtml(html)}\n`);
             return;
         }
-        await this.transporter.sendMail({ from: this.from, to, subject, html });
+        await this.transporter.sendMail({ from: this.from, to, subject, html, text, headers });
+    }
+    close() {
+        this.transporter?.close();
     }
 };
 MailService = MailService_1 = __decorate([

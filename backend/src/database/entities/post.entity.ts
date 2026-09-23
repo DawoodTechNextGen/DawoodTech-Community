@@ -45,6 +45,10 @@ export class Post {
   @Column({ name: 'reviewed_at', type: 'datetime', nullable: true })
   reviewedAt!: Date | null;
 
+  /** When the "new post" email to TaskDesk interns was queued; set once, never reset. */
+  @Column({ name: 'notified_at', type: 'datetime', nullable: true })
+  notifiedAt!: Date | null;
+
   @OneToMany(() => PostMedia, (media) => media.post)
   media!: Relation<PostMedia>[];
 

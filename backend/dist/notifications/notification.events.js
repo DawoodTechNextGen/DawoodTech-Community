@@ -5,5 +5,6 @@ export const NotificationEvents = {
     LikeCreated: 'like.created',
     PostApproved: 'post.approved',
     PostRejected: 'post.rejected',
+    CommentPosted: 'comment.posted',
 };
 //# sourceMappingURL=notification.events.js.map

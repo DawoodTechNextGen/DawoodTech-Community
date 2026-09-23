@@ -20,6 +20,7 @@ import { LikesService } from '../likes/likes.service.js';
 import { PostMedia } from '../database/entities/post-media.entity.js';
 import { Post, PostStatus } from '../database/entities/post.entity.js';
 import { NotificationEvents } from '../notifications/notification.events.js';
+import { PostEmailEvents } from '../post-emails/post-email.events.js';
 import { toPostResponse } from './post.mapper.js';
 const PAGE_SIZE = 20;
 let PostsService = class PostsService {
@@ -158,8 +159,12 @@ let PostsService = class PostsService {
         });
         return posts.map((p) => toPostResponse(p));
     }
-    async approve(id, adminId) {
-        return this.review(id, adminId, PostStatus.APPROVED);
+    async approve(id, adminId, notifyInterns = true) {
+        const response = await this.review(id, adminId, PostStatus.APPROVED);
+        if (notifyInterns) {
+            this.events.emit(PostEmailEvents.PostPublished, { postId: id });
+        }
+        return response;
     }
     async reject(id, adminId) {
         return this.review(id, adminId, PostStatus.REJECTED);

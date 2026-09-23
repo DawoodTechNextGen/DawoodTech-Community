@@ -24,6 +24,7 @@ let Post = class Post {
     status;
     reviewedBy;
     reviewedAt;
+    notifiedAt;
     media;
     createdAt;
     updatedAt;
@@ -59,6 +60,10 @@ __decorate([
     Column({ name: 'reviewed_at', type: 'datetime', nullable: true }),
     __metadata("design:type", Object)
 ], Post.prototype, "reviewedAt", void 0);
+__decorate([
+    Column({ name: 'notified_at', type: 'datetime', nullable: true }),
+    __metadata("design:type", Object)
+], Post.prototype, "notifiedAt", void 0);
 __decorate([
     OneToMany(() => PostMedia, (media) => media.post),
     __metadata("design:type", Array)

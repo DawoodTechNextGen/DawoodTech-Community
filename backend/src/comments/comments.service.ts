@@ -60,6 +60,14 @@ export class CommentsService {
       });
     }
 
+    this.events.emit(NotificationEvents.CommentPosted, {
+      postId,
+      commentId: comment.id,
+      postOwnerId: post.userId,
+      parentCommentAuthorId: parent?.userId ?? null,
+      actorId: userId,
+    });
+
     return toCommentResponse(withAuthor, userId);
   }
 

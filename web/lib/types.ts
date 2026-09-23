@@ -85,3 +85,18 @@ export interface PaginatedNotifications {
   items: Notification[];
   nextCursor: string | null;
 }
+
+export interface PostEmailStats {
+  postId: number;
+  title: string;
+  notifiedAt: string | null;
+  queued: number;
+  sent: number;
+  failed: number;
+  skipped: number;
+}
+
+export interface PostEmailStatsResponse {
+  mode: "live" | "test" | "dry_run";
+  posts: PostEmailStats[];
+}

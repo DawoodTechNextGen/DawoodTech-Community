@@ -1,0 +1,30 @@
+import { ConfigService } from '@nestjs/config';
+import { DataSource, Repository } from 'typeorm';
+import { ActivityEmailQueue } from '../database/entities/activity-email-queue.entity.js';
+import { Comment } from '../database/entities/comment.entity.js';
+import { Like } from '../database/entities/like.entity.js';
+import { Post } from '../database/entities/post.entity.js';
+import { User } from '../database/entities/user.entity.js';
+import { MailService } from '../mail/mail.service.js';
+import { type CommentPostedEvent, type LikeCreatedEvent } from '../notifications/notification.events.js';
+import type { WorkerRunResult } from '../post-emails/post-emails.service.js';
+export declare class ActivityEmailsService {
+    private readonly queue;
+    private readonly posts;
+    private readonly comments;
+    private readonly likes;
+    private readonly users;
+    private readonly dataSource;
+    private readonly mail;
+    private readonly config;
+    private readonly logger;
+    constructor(queue: Repository<ActivityEmailQueue>, posts: Repository<Post>, comments: Repository<Comment>, likes: Repository<Like>, users: Repository<User>, dataSource: DataSource, mail: MailService, config: ConfigService);
+    private get mode();
+    handleLikeCreated({ postId, postOwnerId, actorId }: LikeCreatedEvent): Promise<void>;
+    handleCommentPosted(event: CommentPostedEvent): Promise<void>;
+    private safely;
+    private enqueue;
+    processBatch(): Promise<WorkerRunResult | null>;
+    private sendQueued;
+    private send;
+}

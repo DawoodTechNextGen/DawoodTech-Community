@@ -8,6 +8,7 @@ import { LikesService } from '../likes/likes.service.js';
 import { PostMedia } from '../database/entities/post-media.entity.js';
 import { Post, PostStatus } from '../database/entities/post.entity.js';
 import { NotificationEvents } from '../notifications/notification.events.js';
+import { PostEmailEvents } from '../post-emails/post-email.events.js';
 import type { CreatePostDto } from './dto/create-post.dto.js';
 import type { UpdatePostDto } from './dto/update-post.dto.js';
 import { toPostResponse, type PostResponse } from './post.mapper.js';
@@ -193,8 +194,15 @@ export class PostsService {
     return posts.map((p) => toPostResponse(p));
   }
 
-  async approve(id: number, adminId: number): Promise<PostResponse> {
-    return this.review(id, adminId, PostStatus.APPROVED);
+  async approve(id: number, adminId: number, notifyInterns = true): Promise<PostResponse> {
+    const response = await this.review(id, adminId, PostStatus.APPROVED);
+    // Fire-and-forget: the listener fetches TaskDesk recipients and fills the
+    // email queue, and skips posts that were already notified (e.g. re-approval
+    // after an edit), so the approve request never waits on email.
+    if (notifyInterns) {
+      this.events.emit(PostEmailEvents.PostPublished, { postId: id });
+    }
+    return response;
   }
 
   async reject(id: number, adminId: number): Promise<PostResponse> {

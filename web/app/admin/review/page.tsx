@@ -4,6 +4,7 @@ import { Inbox, ShieldCheck } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useState } from "react";
 import { AppShell } from "@/components/layout/app-shell";
+import { PostEmailStatsPanel } from "@/components/admin/post-email-stats";
 import { ReviewPostCard } from "@/components/admin/review-post-card";
 import { ErrorBanner } from "@/components/ui/error-banner";
 import { api } from "@/lib/api-client";
@@ -40,10 +41,10 @@ export default function AdminReviewPage() {
     if (user?.role === "admin") load();
   }, [user, load]);
 
-  async function handleApprove(post: Post) {
+  async function handleApprove(post: Post, notifyInterns: boolean) {
     setPosts((prev) => prev.filter((p) => p.id !== post.id));
     try {
-      await api.approvePost(post.id);
+      await api.approvePost(post.id, notifyInterns);
     } catch {
       setError("Couldn't approve that post.");
       load();
@@ -117,6 +118,8 @@ export default function AdminReviewPage() {
             ))}
           </div>
         )}
+
+        <PostEmailStatsPanel />
       </div>
     </AppShell>
   );

@@ -3,6 +3,8 @@ interface SendMailInput {
     to: string;
     subject: string;
     html: string;
+    text?: string;
+    headers?: Record<string, string>;
 }
 export declare class MailService {
     private readonly config;
@@ -10,6 +12,8 @@ export declare class MailService {
     private readonly transporter;
     private readonly from;
     constructor(config: ConfigService);
-    send({ to, subject, html }: SendMailInput): Promise<void>;
+    get isConfigured(): boolean;
+    send({ to, subject, html, text, headers }: SendMailInput): Promise<void>;
+    close(): void;
 }
 export {};

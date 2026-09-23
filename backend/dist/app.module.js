@@ -15,6 +15,8 @@ import { UsersModule } from './users/users.module.js';
 import { PostsModule } from './posts/posts.module.js';
 import { NotificationsModule } from './notifications/notifications.module.js';
 import { UploadsModule } from './uploads/uploads.module.js';
+import { PostEmailsModule } from './post-emails/post-emails.module.js';
+import { ActivityEmailsModule } from './activity-emails/activity-emails.module.js';
 import { JwtAuthGuard } from './common/guards/jwt-auth.guard.js';
 let AppModule = class AppModule {
 };
@@ -29,6 +31,8 @@ AppModule = __decorate([
             PostsModule,
             NotificationsModule,
             UploadsModule,
+            PostEmailsModule,
+            ActivityEmailsModule,
         ],
         providers: [{ provide: APP_GUARD, useClass: JwtAuthGuard }],
     })

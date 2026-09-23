@@ -30,7 +30,7 @@ export declare class PostsService {
     updateOwn(id: number, userId: number, dto: UpdatePostDto): Promise<PostResponse>;
     deleteOwn(id: number, userId: number): Promise<void>;
     findPending(): Promise<PostResponse[]>;
-    approve(id: number, adminId: number): Promise<PostResponse>;
+    approve(id: number, adminId: number, notifyInterns?: boolean): Promise<PostResponse>;
     reject(id: number, adminId: number): Promise<PostResponse>;
     private review;
     private attachEngagement;
