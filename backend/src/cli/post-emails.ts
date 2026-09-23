@@ -10,6 +10,11 @@
  *   node dist/cli/post-emails.js test [to]     email a preview digest to one address (defaults
  *                                              to POST_EMAIL_TEST_RECIPIENT): the posts waiting
  *                                              for the next digest, or the latest 3 if none
+ *   node dist/cli/post-emails.js resend-verification
+ *                                              email a fresh verification link to every member who
+ *                                              hasn't verified (and hasn't had one in the last hour),
+ *                                              within EMAIL_HOURLY_LIMIT — run again for the rest.
+ *                                              Needs JWT_EMAIL_TOKEN_SECRET and FRONTEND_URL in .env.
  */
 import { Logger, Module } from '@nestjs/common';
 import { ConfigModule, ConfigService } from '@nestjs/config';
@@ -22,6 +27,8 @@ import { Post, PostStatus } from '../database/entities/post.entity.js';
 import { MailService } from '../mail/mail.service.js';
 import { ActivityEmailsModule } from '../activity-emails/activity-emails.module.js';
 import { ActivityEmailsService } from '../activity-emails/activity-emails.service.js';
+import { VerificationEmailsModule } from '../auth/verification-emails.module.js';
+import { VerificationEmailsService } from '../auth/verification-emails.service.js';
 import { DigestEmailsService } from '../post-emails/digest-emails.service.js';
 import { PostEmailsModule } from '../post-emails/post-emails.module.js';
 import { PostEmailsService } from '../post-emails/post-emails.service.js';
@@ -32,6 +39,7 @@ import { PostEmailsService } from '../post-emails/post-emails.service.js';
     DatabaseModule,
     PostEmailsModule,
     ActivityEmailsModule,
+    VerificationEmailsModule,
   ],
 })
 class PostEmailsCliModule {}
@@ -112,8 +120,23 @@ async function main(): Promise<number> {
         return 0;
       }
 
+      case 'resend-verification': {
+        const { sent, failed, remaining } = await app
+          .get(VerificationEmailsService)
+          .sendPending(60 * 60 * 1000);
+        logger.log(
+          `Verification emails — sent ${sent}, failed ${failed}` +
+            (remaining > 0
+              ? `, ${remaining} still waiting (hourly limit): run this again in an hour.`
+              : ', none left.'),
+        );
+        return 0;
+      }
+
       default:
-        logger.error(`Unknown command "${command}" — use worker, recipients, digest or test`);
+        logger.error(
+          `Unknown command "${command}" — use worker, recipients, digest, test or resend-verification`,
+        );
         return 1;
     }
   } finally {

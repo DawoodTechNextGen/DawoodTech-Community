@@ -9,22 +9,18 @@ import {
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { JwtService, type JwtSignOptions } from '@nestjs/jwt';
-import { InjectDataSource, InjectRepository } from '@nestjs/typeorm';
+import { InjectRepository } from '@nestjs/typeorm';
 import * as bcrypt from 'bcryptjs';
 import { randomUUID } from 'node:crypto';
-import { DataSource, IsNull, LessThan, MoreThan, Repository } from 'typeorm';
+import { MoreThan, Repository } from 'typeorm';
 import { MailService } from '../mail/mail.service.js';
-import {
-  errorMessage,
-  hourlyAllowance,
-  withAdvisoryLock,
-} from '../post-emails/email-worker-utils.js';
-import { resetPasswordTemplate, verifyEmailTemplate } from '../mail/templates.js';
+import { resetPasswordTemplate } from '../mail/templates.js';
 import { RefreshToken } from '../database/entities/refresh-token.entity.js';
 import { User, UserRole, UserStatus } from '../database/entities/user.entity.js';
 import { LoginDto } from './dto/login.dto.js';
 import { SignupDto } from './dto/signup.dto.js';
 import type { JwtPayload } from './jwt.strategy.js';
+import { VerificationEmailsService } from './verification-emails.service.js';
 
 export interface TokenPair {
   accessToken: string;
@@ -41,8 +37,6 @@ interface ActionTokenPayload {
 const BCRYPT_ROUNDS = 12;
 const ACTION_TOKEN_EXPIRES_IN = '1h';
 const VERIFICATION_RETRY_EVERY_MS = 10 * 60 * 1000;
-const VERIFICATION_MAX_ATTEMPTS = 3;
-const VERIFICATION_RETRY_LOCK = 'dawoodtech_community_verification_retry';
 
 @Injectable()
 export class AuthService implements OnApplicationBootstrap, OnModuleDestroy {
@@ -56,15 +50,15 @@ export class AuthService implements OnApplicationBootstrap, OnModuleDestroy {
     private readonly jwt: JwtService,
     private readonly config: ConfigService,
     private readonly mail: MailService,
-    @InjectDataSource() private readonly dataSource: DataSource,
+    private readonly verificationEmails: VerificationEmailsService,
   ) {}
 
   // Verification emails that never went out (mail server busy or rate-limited
   // at signup) are retried as soon as the app starts, then every 10 minutes.
   onApplicationBootstrap(): void {
-    void this.sendPendingVerificationEmails();
+    void this.verificationEmails.sendPending();
     this.retryTimer = setInterval(
-      () => void this.sendPendingVerificationEmails(),
+      () => void this.verificationEmails.sendPending(),
       VERIFICATION_RETRY_EVERY_MS,
     );
     this.retryTimer.unref();
@@ -72,49 +66,6 @@ export class AuthService implements OnApplicationBootstrap, OnModuleDestroy {
 
   onModuleDestroy(): void {
     if (this.retryTimer) clearInterval(this.retryTimer);
-  }
-
-  /** Sends verification emails to unverified members who never received one,
-   *  within EMAIL_HOURLY_LIMIT. Never throws. */
-  async sendPendingVerificationEmails(): Promise<number> {
-    try {
-      const sent = await withAdvisoryLock(this.dataSource, VERIFICATION_RETRY_LOCK, async () => {
-        const allowance = await hourlyAllowance(
-          this.dataSource,
-          this.config.get<number>('postEmails.hourlyLimit') ?? 20,
-        );
-        if (allowance === 0) return 0;
-
-        const pending = await this.users.find({
-          where: {
-            isEmailVerified: false,
-            status: UserStatus.ACTIVE,
-            verificationEmailSentAt: IsNull(),
-            verificationEmailAttempts: LessThan(VERIFICATION_MAX_ATTEMPTS),
-          },
-          order: { id: 'ASC' },
-          take: allowance,
-        });
-
-        let count = 0;
-        for (const user of pending) {
-          try {
-            await this.sendVerificationEmail(user);
-            count++;
-          } catch (err) {
-            this.logger.warn(
-              `Retrying the verification email to ${user.email} failed: ${errorMessage(err)}`,
-            );
-          }
-        }
-        if (count > 0) this.logger.log(`Sent ${count} pending verification email(s).`);
-        return count;
-      });
-      return sent ?? 0;
-    } catch (err) {
-      this.logger.error(`Couldn't send pending verification emails: ${errorMessage(err)}`);
-      return 0;
-    }
   }
 
   async signup(dto: SignupDto): Promise<User> {
@@ -138,7 +89,7 @@ export class AuthService implements OnApplicationBootstrap, OnModuleDestroy {
 
     // A busy or rate-limited mail server must not fail the signup: the account
     // is saved, the app retries the email on its own (see
-    // sendPendingVerificationEmails), and the login page offers a resend.
+    // onApplicationBootstrap), and the login page offers a resend.
     try {
       await this.sendVerificationEmail(user);
     } catch (err) {
@@ -172,18 +123,8 @@ export class AuthService implements OnApplicationBootstrap, OnModuleDestroy {
     return { user, tokens };
   }
 
-  /** Sends a fresh verification link and records whether it went out. */
-  async sendVerificationEmail(user: User): Promise<void> {
-    const token = await this.signActionToken(user.id, 'verify-email');
-    const link = `${this.config.get<string>('frontendUrl')}/verify-email?token=${token}`;
-    const { subject, html } = verifyEmailTemplate(user.fullName, link);
-    try {
-      await this.mail.send({ to: user.email, subject, html });
-    } catch (err) {
-      await this.users.increment({ id: user.id }, 'verificationEmailAttempts', 1);
-      throw err;
-    }
-    await this.users.update({ id: user.id }, { verificationEmailSentAt: new Date() });
+  sendVerificationEmail(user: User): Promise<void> {
+    return this.verificationEmails.send(user);
   }
 
   async resendVerification(email: string): Promise<void> {

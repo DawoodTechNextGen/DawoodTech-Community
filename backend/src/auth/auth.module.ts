@@ -9,6 +9,7 @@ import { UsersModule } from '../users/users.module.js';
 import { AuthController } from './auth.controller.js';
 import { AuthService } from './auth.service.js';
 import { JwtStrategy } from './jwt.strategy.js';
+import { VerificationEmailsModule } from './verification-emails.module.js';
 
 @Module({
   imports: [
@@ -17,6 +18,7 @@ import { JwtStrategy } from './jwt.strategy.js';
     JwtModule.register({}),
     UsersModule,
     MailModule,
+    VerificationEmailsModule,
   ],
   controllers: [AuthController],
   providers: [AuthService, JwtStrategy],

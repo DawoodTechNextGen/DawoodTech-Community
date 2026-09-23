@@ -15,6 +15,7 @@ import { UsersModule } from '../users/users.module.js';
 import { AuthController } from './auth.controller.js';
 import { AuthService } from './auth.service.js';
 import { JwtStrategy } from './jwt.strategy.js';
+import { VerificationEmailsModule } from './verification-emails.module.js';
 let AuthModule = class AuthModule {
 };
 AuthModule = __decorate([
@@ -25,6 +26,7 @@ AuthModule = __decorate([
             JwtModule.register({}),
             UsersModule,
             MailModule,
+            VerificationEmailsModule,
         ],
         controllers: [AuthController],
         providers: [AuthService, JwtStrategy],

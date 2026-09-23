@@ -14,6 +14,8 @@ import { Post, PostStatus } from '../database/entities/post.entity.js';
 import { MailService } from '../mail/mail.service.js';
 import { ActivityEmailsModule } from '../activity-emails/activity-emails.module.js';
 import { ActivityEmailsService } from '../activity-emails/activity-emails.service.js';
+import { VerificationEmailsModule } from '../auth/verification-emails.module.js';
+import { VerificationEmailsService } from '../auth/verification-emails.service.js';
 import { DigestEmailsService } from '../post-emails/digest-emails.service.js';
 import { PostEmailsModule } from '../post-emails/post-emails.module.js';
 import { PostEmailsService } from '../post-emails/post-emails.service.js';
@@ -26,6 +28,7 @@ PostEmailsCliModule = __decorate([
             DatabaseModule,
             PostEmailsModule,
             ActivityEmailsModule,
+            VerificationEmailsModule,
         ],
     })
 ], PostEmailsCliModule);
@@ -92,8 +95,18 @@ async function main() {
                 logger.log(`Sent a preview digest of ${posts.length} post(s) to ${to}`);
                 return 0;
             }
+            case 'resend-verification': {
+                const { sent, failed, remaining } = await app
+                    .get(VerificationEmailsService)
+                    .sendPending(60 * 60 * 1000);
+                logger.log(`Verification emails — sent ${sent}, failed ${failed}` +
+                    (remaining > 0
+                        ? `, ${remaining} still waiting (hourly limit): run this again in an hour.`
+                        : ', none left.'));
+                return 0;
+            }
             default:
-                logger.error(`Unknown command "${command}" — use worker, recipients, digest or test`);
+                logger.error(`Unknown command "${command}" — use worker, recipients, digest, test or resend-verification`);
                 return 1;
         }
     }
