@@ -13,7 +13,9 @@ export interface Recipient {
 const INTERN_ROLES = [2, 6];
 // TaskDesk users.status 1 = active; registrations.status 'hire' = hired.
 // Finished interns are the ones with an approved certificate
-// (certificate.approve_status = 1) — their account may no longer be active.
+// (certificate.approve_status = 1). Accounts stay active after an internship
+// ends, so "active" alone would mean every intern ever — hence the recency
+// window (TASKDESK_RECENT_MONTHS).
 const ACTIVE_USER_STATUS = 1;
 const HIRED_REGISTRATION_STATUS = 'hire';
 
@@ -38,20 +40,35 @@ export class TaskdeskRecipientsService implements OnModuleDestroy {
     return this.pool;
   }
 
-  /** TaskDesk intern/candidate accounts that are active or finished their
-   *  internship (approved certificate), plus hired registrations —
-   *  de-duplicated by trimmed, lowercased email. New, rejected and other
-   *  registrations are left out: many of those addresses bounce, and cPanel
-   *  blocks all of the domain's mail for an hour after a handful of bounces. */
+  /** Recent TaskDesk interns, de-duplicated by trimmed, lowercased email:
+   *  active intern/candidate accounts that joined in the last N months,
+   *  interns whose certificate was approved in the last N months, and
+   *  registrations hired in the last N months (N = TASKDESK_RECENT_MONTHS).
+   *  New, rejected and other registrations are left out: many of those
+   *  addresses bounce, and cPanel blocks all of the domain's mail for an hour
+   *  after a handful of bounces. */
   async fetchRecipients(): Promise<Recipient[]> {
+    const months = this.config.get<number>('taskdeskDb.recentMonths') ?? 3;
     const [rows] = await this.getPool().query<RowDataPacket[]>(
-      `SELECT name, email FROM registrations WHERE status = ?
+      `SELECT name, email FROM registrations
+       WHERE status = ? AND COALESCE(updated_at, created_at) >= NOW() - INTERVAL ? MONTH
        UNION ALL
        SELECT name, email FROM users
-       WHERE user_role IN (?)
-         AND (status = ?
-              OR id IN (SELECT intern_id FROM certificate WHERE approve_status = 1))`,
-      [HIRED_REGISTRATION_STATUS, INTERN_ROLES, ACTIVE_USER_STATUS],
+       WHERE user_role IN (?) AND status = ? AND created_at >= NOW() - INTERVAL ? MONTH
+       UNION ALL
+       SELECT u.name, u.email FROM users u
+       JOIN certificate c ON c.intern_id = u.id
+       WHERE u.user_role IN (?) AND c.approve_status = 1
+         AND c.created_at >= NOW() - INTERVAL ? MONTH`,
+      [
+        HIRED_REGISTRATION_STATUS,
+        months,
+        INTERN_ROLES,
+        ACTIVE_USER_STATUS,
+        months,
+        INTERN_ROLES,
+        months,
+      ],
     );
     return dedupeRecipients(rows as { name: string | null; email: string | null }[]);
   }

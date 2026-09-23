@@ -51,6 +51,9 @@ export default () => ({
     user: process.env.TASKDESK_DB_USER ?? '',
     password: process.env.TASKDESK_DB_PASS ?? '',
     database: process.env.TASKDESK_DB_NAME || 'task_management',
+    // Only interns from the last N months get the digest (TaskDesk accounts
+    // stay active after an internship ends).
+    recentMonths: parseInt(process.env.TASKDESK_RECENT_MONTHS ?? '3', 10),
   },
   postEmails: {
     // live    — queue every TaskDesk intern

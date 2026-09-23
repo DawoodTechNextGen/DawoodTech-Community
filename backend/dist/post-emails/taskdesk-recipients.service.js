@@ -35,12 +35,25 @@ let TaskdeskRecipientsService = TaskdeskRecipientsService_1 = class TaskdeskReci
         return this.pool;
     }
     async fetchRecipients() {
-        const [rows] = await this.getPool().query(`SELECT name, email FROM registrations WHERE status = ?
+        const months = this.config.get('taskdeskDb.recentMonths') ?? 3;
+        const [rows] = await this.getPool().query(`SELECT name, email FROM registrations
+       WHERE status = ? AND COALESCE(updated_at, created_at) >= NOW() - INTERVAL ? MONTH
        UNION ALL
        SELECT name, email FROM users
-       WHERE user_role IN (?)
-         AND (status = ?
-              OR id IN (SELECT intern_id FROM certificate WHERE approve_status = 1))`, [HIRED_REGISTRATION_STATUS, INTERN_ROLES, ACTIVE_USER_STATUS]);
+       WHERE user_role IN (?) AND status = ? AND created_at >= NOW() - INTERVAL ? MONTH
+       UNION ALL
+       SELECT u.name, u.email FROM users u
+       JOIN certificate c ON c.intern_id = u.id
+       WHERE u.user_role IN (?) AND c.approve_status = 1
+         AND c.created_at >= NOW() - INTERVAL ? MONTH`, [
+            HIRED_REGISTRATION_STATUS,
+            months,
+            INTERN_ROLES,
+            ACTIVE_USER_STATUS,
+            months,
+            INTERN_ROLES,
+            months,
+        ]);
         return dedupeRecipients(rows);
     }
     async onModuleDestroy() {

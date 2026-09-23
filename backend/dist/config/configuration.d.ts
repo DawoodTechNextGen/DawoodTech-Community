@@ -36,6 +36,7 @@ declare const _default: () => {
         user: string;
         password: string;
         database: string;
+        recentMonths: number;
     };
     postEmails: {
         mode: "live" | "test" | "dry_run";

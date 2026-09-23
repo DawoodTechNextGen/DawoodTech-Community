@@ -44,6 +44,7 @@ export default () => ({
         user: process.env.TASKDESK_DB_USER ?? '',
         password: process.env.TASKDESK_DB_PASS ?? '',
         database: process.env.TASKDESK_DB_NAME || 'task_management',
+        recentMonths: parseInt(process.env.TASKDESK_RECENT_MONTHS ?? '3', 10),
     },
     postEmails: {
         mode: (process.env.POST_EMAIL_MODE ?? 'dry_run'),
