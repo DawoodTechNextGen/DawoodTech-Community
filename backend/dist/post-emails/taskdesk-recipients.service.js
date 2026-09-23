@@ -37,7 +37,10 @@ let TaskdeskRecipientsService = TaskdeskRecipientsService_1 = class TaskdeskReci
     async fetchRecipients() {
         const [rows] = await this.getPool().query(`SELECT name, email FROM registrations WHERE status = ?
        UNION ALL
-       SELECT name, email FROM users WHERE user_role IN (?) AND status = ?`, [HIRED_REGISTRATION_STATUS, INTERN_ROLES, ACTIVE_USER_STATUS]);
+       SELECT name, email FROM users
+       WHERE user_role IN (?)
+         AND (status = ?
+              OR id IN (SELECT intern_id FROM certificate WHERE approve_status = 1))`, [HIRED_REGISTRATION_STATUS, INTERN_ROLES, ACTIVE_USER_STATUS]);
         return dedupeRecipients(rows);
     }
     async onModuleDestroy() {

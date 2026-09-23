@@ -12,6 +12,8 @@ export interface Recipient {
 // TaskDesk user_role values that count as interns: 2 = intern, 6 = candidate.
 const INTERN_ROLES = [2, 6];
 // TaskDesk users.status 1 = active; registrations.status 'hire' = hired.
+// Finished interns are the ones with an approved certificate
+// (certificate.approve_status = 1) — their account may no longer be active.
 const ACTIVE_USER_STATUS = 1;
 const HIRED_REGISTRATION_STATUS = 'hire';
 
@@ -36,7 +38,8 @@ export class TaskdeskRecipientsService implements OnModuleDestroy {
     return this.pool;
   }
 
-  /** Active TaskDesk intern/candidate accounts plus hired registrations —
+  /** TaskDesk intern/candidate accounts that are active or finished their
+   *  internship (approved certificate), plus hired registrations —
    *  de-duplicated by trimmed, lowercased email. New, rejected and other
    *  registrations are left out: many of those addresses bounce, and cPanel
    *  blocks all of the domain's mail for an hour after a handful of bounces. */
@@ -44,7 +47,10 @@ export class TaskdeskRecipientsService implements OnModuleDestroy {
     const [rows] = await this.getPool().query<RowDataPacket[]>(
       `SELECT name, email FROM registrations WHERE status = ?
        UNION ALL
-       SELECT name, email FROM users WHERE user_role IN (?) AND status = ?`,
+       SELECT name, email FROM users
+       WHERE user_role IN (?)
+         AND (status = ?
+              OR id IN (SELECT intern_id FROM certificate WHERE approve_status = 1))`,
       [HIRED_REGISTRATION_STATUS, INTERN_ROLES, ACTIVE_USER_STATUS],
     );
     return dedupeRecipients(rows as { name: string | null; email: string | null }[]);
