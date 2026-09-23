@@ -1,9 +1,6 @@
-import { PostEmailsService } from './post-emails.service.js';
+import { DigestEmailsService } from './digest-emails.service.js';
 export declare class AdminPostEmailsController {
-    private readonly postEmails;
-    constructor(postEmails: PostEmailsService);
-    stats(): Promise<{
-        mode: import("./post-emails.service.js").PostEmailMode;
-        posts: import("./post-emails.service.js").PostEmailStats[];
-    }>;
+    private readonly digests;
+    constructor(digests: DigestEmailsService);
+    stats(): Promise<import("./digest-emails.service.js").DigestStatsResponse>;
 }

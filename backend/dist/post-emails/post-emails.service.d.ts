@@ -3,19 +3,10 @@ import { DataSource, Repository } from 'typeorm';
 import { Post } from '../database/entities/post.entity.js';
 import { PostEmailQueue } from '../database/entities/post-email-queue.entity.js';
 import { User } from '../database/entities/user.entity.js';
+import { type DigestPost } from '../mail/community-templates.js';
 import { MailService } from '../mail/mail.service.js';
-import { type PostPublishedEvent } from './post-email.events.js';
 import { TaskdeskRecipientsService, type Recipient } from './taskdesk-recipients.service.js';
 export type PostEmailMode = 'live' | 'test' | 'dry_run';
-export interface PostEmailStats {
-    postId: number;
-    title: string;
-    notifiedAt: string | null;
-    queued: number;
-    sent: number;
-    failed: number;
-    skipped: number;
-}
 export interface WorkerRunResult {
     sent: number;
     failed: number;
@@ -33,15 +24,10 @@ export declare class PostEmailsService {
     private readonly logger;
     constructor(posts: Repository<Post>, queue: Repository<PostEmailQueue>, users: Repository<User>, dataSource: DataSource, recipients: TaskdeskRecipientsService, mail: MailService, config: ConfigService);
     get mode(): PostEmailMode;
-    handlePostPublished({ postId }: PostPublishedEvent): Promise<void>;
-    enqueueForPost(postId: number): Promise<void>;
-    eligibleRecipients(postId?: number): Promise<Recipient[]>;
-    private insertQueueRows;
+    eligibleRecipients(): Promise<Recipient[]>;
+    toDigestPost(post: Post): DigestPost;
+    sendDigest(posts: Post[], email: string, recipientName: string | null, date: Date): Promise<void>;
+    legacyQueuedCount(): Promise<number>;
     processBatch(): Promise<WorkerRunResult | null>;
     private sendQueued;
-    sendForPost(post: Post, email: string, recipientName: string | null): Promise<void>;
-    stats(limit?: number): Promise<{
-        mode: PostEmailMode;
-        posts: PostEmailStats[];
-    }>;
 }

@@ -20,6 +20,10 @@ import { PostEmailNotifications1790136000000 } from './migrations/1790136000000-
 import { ActivityEmails1790200000000 } from './migrations/1790200000000-ActivityEmails.js';
 import { FollowEmails1790300000000 } from './migrations/1790300000000-FollowEmails.js';
 import { ActivityEmailQueue } from './entities/activity-email-queue.entity.js';
+import { EmailDigest } from './entities/email-digest.entity.js';
+import { DigestEmailQueue } from './entities/digest-email-queue.entity.js';
+import { EmailDigests1790400000000 } from './migrations/1790400000000-EmailDigests.js';
+import { VerificationEmailRetry1790500000000 } from './migrations/1790500000000-VerificationEmailRetry.js';
 let DatabaseModule = class DatabaseModule {
 };
 DatabaseModule = __decorate([
@@ -46,12 +50,16 @@ DatabaseModule = __decorate([
                         Notification,
                         PostEmailQueue,
                         ActivityEmailQueue,
+                        EmailDigest,
+                        DigestEmailQueue,
                     ],
                     synchronize: config.get('nodeEnv') !== 'production',
                     migrations: [
                         PostEmailNotifications1790136000000,
                         ActivityEmails1790200000000,
                         FollowEmails1790300000000,
+                        EmailDigests1790400000000,
+                        VerificationEmailRetry1790500000000,
                     ],
                     migrationsRun: true,
                     charset: 'utf8mb4',

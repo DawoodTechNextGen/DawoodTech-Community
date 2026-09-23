@@ -43,6 +43,9 @@ declare const _default: () => {
         batchSize: number;
         delayMs: number;
         maxAttempts: number;
+        hourlyLimit: number;
+        digestHour: number;
+        digestTimeZone: string;
         activityMode: "live" | "test" | "dry_run";
     };
 };

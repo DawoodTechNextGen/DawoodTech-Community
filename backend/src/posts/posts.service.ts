@@ -1,14 +1,13 @@
 import { ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { IsNull, Repository } from 'typeorm';
 import { CommentsService } from '../comments/comments.service.js';
 import { FollowsService } from '../follows/follows.service.js';
 import { LikesService } from '../likes/likes.service.js';
 import { PostMedia } from '../database/entities/post-media.entity.js';
 import { Post, PostStatus } from '../database/entities/post.entity.js';
 import { NotificationEvents } from '../notifications/notification.events.js';
-import { PostEmailEvents } from '../post-emails/post-email.events.js';
 import type { CreatePostDto } from './dto/create-post.dto.js';
 import type { UpdatePostDto } from './dto/update-post.dto.js';
 import { toPostResponse, type PostResponse } from './post.mapper.js';
@@ -196,12 +195,10 @@ export class PostsService {
 
   async approve(id: number, adminId: number, notifyInterns = true): Promise<PostResponse> {
     const response = await this.review(id, adminId, PostStatus.APPROVED);
-    // Fire-and-forget: the listener fetches TaskDesk recipients and fills the
-    // email queue, and skips posts that were already notified (e.g. re-approval
-    // after an edit), so the approve request never waits on email.
-    if (notifyInterns) {
-      this.events.emit(PostEmailEvents.PostPublished, { postId: id });
-    }
+    // Emails go out in the next daily digest (see DigestEmailsService). A post
+    // that was already emailed keeps notified_at, so re-approving it after an
+    // edit never sends it again.
+    await this.posts.update({ id, notifiedAt: IsNull() }, { notifyByEmail: notifyInterns });
     return response;
   }
 

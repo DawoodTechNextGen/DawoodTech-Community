@@ -1,4 +1,4 @@
-// Card-style community emails (new post, likes, comments), modelled on
+// Card-style community emails (daily digest, likes, comments, follows), modelled on
 // daily.dev's digest. Laid out with tables + inline styles so they render
 // consistently in Gmail/Outlook. Every value is escaped here — callers pass
 // plain text.
@@ -132,9 +132,12 @@ function textFooter(input: CommonEmailInput, reason: string): string[] {
   ];
 }
 
-// --- New post (to TaskDesk interns and community members) ---
+// --- Daily digest of new posts (to TaskDesk interns and community members) ---
 
-export interface NewPostEmailInput extends CommonEmailInput {
+/** More than this and the rest are summed up as "and N more" with a feed link. */
+const DIGEST_MAX_POSTS = 10;
+
+export interface DigestPost {
   title: string;
   authorName: string;
   /** Absolute URL, or null to fall back to an initial badge. */
@@ -142,36 +145,61 @@ export interface NewPostEmailInput extends CommonEmailInput {
   excerpt: string;
   /** Absolute URL of the post's first image, if it has one. */
   imageUrl: string | null;
-  postUrl: string;
+  url: string;
 }
 
-export function newPostTemplate(input: NewPostEmailInput): RenderedEmail {
-  const reason = "because you're part of DawoodTech Community or registered for a DawoodTech internship.";
-  const communityUrl = e(input.communityUrl);
-  const postUrl = e(input.postUrl);
+export interface DigestEmailInput extends CommonEmailInput {
+  /** Oldest first. At least one. */
+  posts: DigestPost[];
+}
 
-  const bodyRows = `
-        <tr><td style="padding: 18px 0 4px; font-size: 14px; line-height: 1.6; color: #4b5563;">
-          ${e(greeting(input.recipientName))} a new post was just published in DawoodTech Community.
-        </td></tr>
-
-        <tr><td style="padding: 14px 0 22px; border-bottom: 1px solid ${BORDER};">
+function digestPostRow(post: DigestPost): string {
+  const url = e(post.url);
+  return `
+        <tr><td style="padding: 18px 0 22px; border-bottom: 1px solid ${BORDER};">
           <table role="presentation" width="100%" cellpadding="0" cellspacing="0"><tr>
             <td valign="middle">
               <table role="presentation" cellpadding="0" cellspacing="0"><tr>
-                <td valign="middle" style="padding-right: 8px;">${avatar(input.authorName, input.authorAvatarUrl)}</td>
-                <td valign="middle" style="font-size: 15px; color: #374151;">${e(input.authorName)}</td>
+                <td valign="middle" style="padding-right: 8px;">${avatar(post.authorName, post.authorAvatarUrl)}</td>
+                <td valign="middle" style="font-size: 15px; color: #374151;">${e(post.authorName)}</td>
               </tr></table>
               <div class="post-title" style="font-size: 17px; font-weight: 700; line-height: 1.45; margin: 12px 0 8px;">
-                <a href="${postUrl}" style="color: #111827; text-decoration: none;">${e(input.title)}</a>
+                <a href="${url}" style="color: #111827; text-decoration: none;">${e(post.title)}</a>
               </div>
-              ${input.excerpt ? `<div class="excerpt" style="font-size: 14px; line-height: 1.6; color: #4b5563; margin-bottom: 16px; white-space: pre-line;">${e(input.excerpt)}</div>` : '<div style="height: 8px;"></div>'}
-              ${pillButton(input.postUrl, 'Read post')}
+              ${post.excerpt ? `<div class="excerpt" style="font-size: 14px; line-height: 1.6; color: #4b5563; margin-bottom: 16px; white-space: pre-line;">${e(post.excerpt)}</div>` : '<div style="height: 8px;"></div>'}
+              ${pillButton(post.url, 'Read post')}
             </td>
-            ${thumbnailCell(input.imageUrl, input.postUrl)}
+            ${thumbnailCell(post.imageUrl, post.url)}
           </tr></table>
-        </td></tr>
+        </td></tr>`;
+}
 
+export function digestTemplate(input: DigestEmailInput): RenderedEmail {
+  const reason = "because you're part of DawoodTech Community or registered for a DawoodTech internship.";
+  const communityUrl = e(input.communityUrl);
+  const total = input.posts.length;
+  const single = total === 1;
+  const shown = input.posts.slice(0, DIGEST_MAX_POSTS);
+  const more = total - shown.length;
+
+  const intro = single
+    ? `${greeting(input.recipientName)} a new post was published in DawoodTech Community.`
+    : `${greeting(input.recipientName)} here's what was shared in DawoodTech Community today: ${total} new posts.`;
+
+  const bodyRows = `
+        <tr><td style="padding: 18px 0 0; font-size: 14px; line-height: 1.6; color: #4b5563;">
+          ${e(intro)}
+        </td></tr>
+${shown.map(digestPostRow).join('')}
+${
+  more > 0
+    ? `
+        <tr><td style="padding: 18px 0 0; font-size: 14px; line-height: 1.6; color: #374151;">
+          And ${more} more new post${more > 1 ? 's' : ''} —
+          <a href="${communityUrl}/feed" style="color: ${BRAND}; font-weight: 600; text-decoration: none;">see them all in the community &rarr;</a>
+        </td></tr>`
+    : ''
+}
         <tr><td style="padding: 18px 0 14px; font-size: 13px; line-height: 1.6; color: ${MUTED};">
           Looking for more stories from fellow interns?
           <a href="${communityUrl}/feed" style="color: ${MUTED}; text-decoration: underline;">Browse the latest posts in the community &rarr;</a>
@@ -184,22 +212,27 @@ export function newPostTemplate(input: NewPostEmailInput): RenderedEmail {
           </div>
         </td></tr>`;
 
+  const heading = single ? 'New post' : 'Daily digest';
   const text = [
-    `New post · ${formatDate(input.date)}`,
+    `${heading} · ${formatDate(input.date)}`,
     '',
-    `${greeting(input.recipientName)} a new post was just published in DawoodTech Community.`,
-    '',
-    input.authorName,
-    input.title,
-    input.excerpt,
-    '',
-    `Read post: ${input.postUrl}`,
+    intro,
+    ...shown.flatMap((post) => [
+      '',
+      post.authorName,
+      post.title,
+      ...(post.excerpt ? [post.excerpt] : []),
+      `Read post: ${post.url}`,
+    ]),
+    ...(more > 0 ? ['', `And ${more} more: ${input.communityUrl}/feed`] : []),
     ...textFooter(input, reason),
   ].join('\n');
 
   return {
-    subject: `New post in DawoodTech Community: ${input.title}`,
-    html: shell({ ...input, heading: 'New post', footerReason: reason, bodyRows }),
+    subject: single
+      ? `New post in DawoodTech Community: ${input.posts[0]!.title}`
+      : `${total} new posts in DawoodTech Community today`,
+    html: shell({ ...input, heading, footerReason: reason, bodyRows }),
     text,
   };
 }

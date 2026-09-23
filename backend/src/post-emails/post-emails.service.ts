@@ -1,17 +1,15 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { OnEvent } from '@nestjs/event-emitter';
 import { InjectDataSource, InjectRepository } from '@nestjs/typeorm';
-import { DataSource, IsNull, Repository } from 'typeorm';
+import { DataSource, Repository } from 'typeorm';
 import { Post, PostStatus } from '../database/entities/post.entity.js';
 import {
   PostEmailQueue,
   PostEmailStatus,
 } from '../database/entities/post-email-queue.entity.js';
 import { User, UserStatus } from '../database/entities/user.entity.js';
-import { newPostTemplate } from '../mail/community-templates.js';
+import { digestTemplate, type DigestPost } from '../mail/community-templates.js';
 import { MailService } from '../mail/mail.service.js';
-import { PostEmailEvents, type PostPublishedEvent } from './post-email.events.js';
 import { postExcerpt, postTitle } from './post-summary.js';
 import {
   dedupeRecipients,
@@ -20,7 +18,7 @@ import {
 } from './taskdesk-recipients.service.js';
 import {
   errorMessage,
-  normalizeEmail,
+  hourlyAllowance,
   sleep,
   toAbsoluteUrl,
   withAdvisoryLock,
@@ -28,18 +26,7 @@ import {
 
 export type PostEmailMode = 'live' | 'test' | 'dry_run';
 
-const INSERT_CHUNK = 500;
 const WORKER_LOCK = 'dawoodtech_community_post_email_worker';
-
-export interface PostEmailStats {
-  postId: number;
-  title: string;
-  notifiedAt: string | null;
-  queued: number;
-  sent: number;
-  failed: number;
-  skipped: number;
-}
 
 export interface WorkerRunResult {
   sent: number;
@@ -48,6 +35,11 @@ export interface WorkerRunResult {
   skipped: number;
 }
 
+/**
+ * Who gets new-post emails, and how a post is rendered for them. New posts go
+ * out in the daily digest (DigestEmailsService); the worker here only drains
+ * the older one-email-per-post queue (post_email_queue) left from before that.
+ */
 @Injectable()
 export class PostEmailsService {
   private readonly logger = new Logger(PostEmailsService.name);
@@ -67,108 +59,62 @@ export class PostEmailsService {
     return this.config.get<PostEmailMode>('postEmails.mode') ?? 'dry_run';
   }
 
-  // --- Enqueue (runs off the approve request, via the event emitter) ---
-
-  @OnEvent(PostEmailEvents.PostPublished)
-  async handlePostPublished({ postId }: PostPublishedEvent): Promise<void> {
-    try {
-      await this.enqueueForPost(postId);
-    } catch (err) {
-      this.logger.error(`Couldn't queue emails for post ${postId}: ${errorMessage(err)}`);
-    }
-  }
-
-  async enqueueForPost(postId: number): Promise<void> {
-    const mode = this.mode;
-
-    if (mode === 'test') {
-      const testRecipient = this.config.get<string>('postEmails.testRecipient');
-      if (!testRecipient) {
-        this.logger.warn('POST_EMAIL_MODE=test but POST_EMAIL_TEST_RECIPIENT is empty');
-        return;
-      }
-      // notified_at is left untouched so the post can still go out for real later.
-      const added = await this.insertQueueRows(postId, [
-        { email: normalizeEmail(testRecipient), name: null },
-      ]);
-      this.logger.log(`[test] Post ${postId}: queued ${added} email to ${testRecipient}`);
-      return;
-    }
-
-    if (mode === 'dry_run') {
-      const recipients = await this.eligibleRecipients(postId);
-      this.logger.log(
-        `[dry_run] Post ${postId} would be emailed to ${recipients.length} recipients:\n` +
-          recipients.map((r) => `  ${r.email}${r.name ? ` (${r.name})` : ''}`).join('\n'),
-      );
-      return;
-    }
-
-    // Claim the post atomically: whoever flips notified_at from NULL owns the
-    // enqueue, so a double-click, re-approval or retry can't queue it twice.
-    const claim = await this.posts.update(
-      { id: postId, notifiedAt: IsNull(), status: PostStatus.APPROVED },
-      { notifiedAt: new Date() },
-    );
-    if (!claim.affected) return;
-
-    try {
-      const recipients = await this.eligibleRecipients(postId);
-      const added = await this.insertQueueRows(postId, recipients);
-      this.logger.log(`Post ${postId}: queued ${added} emails`);
-    } catch (err) {
-      // Nothing (or only part) was queued — release the claim so a re-approval
-      // can retry. Rows already inserted are protected by the unique key.
-      await this.posts.update({ id: postId }, { notifiedAt: null });
-      throw err;
-    }
-  }
-
-  /** TaskDesk interns plus active, verified community members — one entry per
-   *  address. The post's own author (when given) is left out. */
-  async eligibleRecipients(postId?: number): Promise<Recipient[]> {
-    const [interns, members, post] = await Promise.all([
+  /** TaskDesk interns plus active, verified community members — one entry per address. */
+  async eligibleRecipients(): Promise<Recipient[]> {
+    const [interns, members] = await Promise.all([
       this.recipients.fetchRecipients(),
       this.users.find({
         select: { email: true, fullName: true },
         where: { status: UserStatus.ACTIVE, isEmailVerified: true },
       }),
-      postId ? this.posts.findOne({ where: { id: postId }, relations: { author: true } }) : null,
     ]);
-    const authorEmail = post?.author ? normalizeEmail(post.author.email) : null;
     return dedupeRecipients([
       ...interns,
       ...members.map((u) => ({ email: u.email, name: u.fullName })),
-    ]).filter((r) => r.email !== authorEmail);
+    ]);
   }
 
-  private async insertQueueRows(postId: number, recipients: Recipient[]): Promise<number> {
-    let added = 0;
-    for (let i = 0; i < recipients.length; i += INSERT_CHUNK) {
-      const result = await this.queue
-        .createQueryBuilder()
-        .insert()
-        .into(PostEmailQueue)
-        .values(
-          recipients.slice(i, i + INSERT_CHUNK).map((r) => ({
-            postId,
-            email: r.email,
-            recipientName: r.name,
-            status: PostEmailStatus.QUEUED,
-          })),
-        )
-        .orIgnore()
-        .updateEntity(false)
-        .execute();
-      added += (result.raw as { affectedRows?: number }).affectedRows ?? 0;
-    }
-    return added;
+  /** A post (loaded with author + media) as a digest entry. */
+  toDigestPost(post: Post): DigestPost {
+    const communityUrl = this.config.get<string>('communityUrl')!;
+    const apiUrl = this.config.get<string>('apiPublicUrl')!;
+    const firstImage = [...(post.media ?? [])].sort((a, b) => a.sortOrder - b.sortOrder)[0];
+    return {
+      title: postTitle(post.content),
+      authorName: post.author?.fullName ?? 'A community member',
+      authorAvatarUrl: toAbsoluteUrl(apiUrl, post.author?.avatarUrl),
+      excerpt: postExcerpt(post.content),
+      imageUrl: toAbsoluteUrl(apiUrl, firstImage?.url),
+      url: `${communityUrl}/post/${post.id}`,
+    };
   }
 
-  // --- Worker (driven by the cron CLI, see src/cli/post-emails.ts) ---
+  /** Renders and sends a digest of `posts` (oldest first) to one address. */
+  async sendDigest(
+    posts: Post[],
+    email: string,
+    recipientName: string | null,
+    date: Date,
+  ): Promise<void> {
+    const communityUrl = this.config.get<string>('communityUrl')!;
+    const { subject, html, text } = digestTemplate({
+      recipientName,
+      recipientEmail: email,
+      posts: posts.map((p) => this.toDigestPost(p)),
+      communityUrl,
+      logoUrl: `${communityUrl}/logo-full.png`,
+      date,
+    });
+    await this.mail.send({ to: email, subject, html, text });
+  }
 
-  /** Sends one batch of queued emails. A MySQL advisory lock keeps two
-   *  overlapping cron runs from sending the same rows. */
+  /** Queued emails left in the older one-email-per-post queue. */
+  legacyQueuedCount(): Promise<number> {
+    return this.queue.countBy({ status: PostEmailStatus.QUEUED });
+  }
+
+  // --- Worker for the older per-post queue (driven by the cron CLI) ---
+
   async processBatch(): Promise<WorkerRunResult | null> {
     if (!this.mail.isConfigured) {
       this.logger.warn('SMTP is not configured (MAIL_HOST) — not sending anything.');
@@ -188,12 +134,22 @@ export class PostEmailsService {
     const maxAttempts = this.config.get<number>('postEmails.maxAttempts') ?? 3;
     const result: WorkerRunResult = { sent: 0, failed: 0, retrying: 0, skipped: 0 };
 
+    if ((await this.legacyQueuedCount()) === 0) return result;
+
+    const allowance = await hourlyAllowance(
+      this.dataSource,
+      this.config.get<number>('postEmails.hourlyLimit') ?? 20,
+    );
+    if (allowance === 0) {
+      this.logger.log('Hourly email limit reached — queued post emails wait for a later run.');
+      return result;
+    }
+
     const rows = await this.queue.find({
       where: { status: PostEmailStatus.QUEUED },
       order: { id: 'ASC' },
-      take: batchSize,
+      take: Math.min(batchSize, allowance),
     });
-    if (rows.length === 0) return result;
 
     const postCache = new Map<number, Post | null>();
 
@@ -218,7 +174,7 @@ export class PostEmailsService {
       row.attempts += 1;
       row.lastAttemptAt = new Date();
       try {
-        await this.sendForPost(post, row.email, row.recipientName);
+        await this.sendDigest([post], row.email, row.recipientName, post.reviewedAt ?? post.createdAt);
         row.status = PostEmailStatus.SENT;
         row.sentAt = new Date();
         row.error = null;
@@ -244,72 +200,5 @@ export class PostEmailsService {
     }
 
     return result;
-  }
-
-  /** Renders and sends the "new post" email to a single address. Used by the
-   *  worker, and directly by the CLI's `test` command. */
-  async sendForPost(post: Post, email: string, recipientName: string | null): Promise<void> {
-    const communityUrl = this.config.get<string>('communityUrl')!;
-    const apiUrl = this.config.get<string>('apiPublicUrl')!;
-    const absolute = (url: string | null | undefined) => toAbsoluteUrl(apiUrl, url);
-    const firstImage = [...(post.media ?? [])].sort((a, b) => a.sortOrder - b.sortOrder)[0];
-
-    const { subject, html, text } = newPostTemplate({
-      recipientName,
-      recipientEmail: email,
-      title: postTitle(post.content),
-      authorName: post.author?.fullName ?? 'A community member',
-      authorAvatarUrl: absolute(post.author?.avatarUrl),
-      excerpt: postExcerpt(post.content),
-      imageUrl: absolute(firstImage?.url),
-      postUrl: `${communityUrl}/post/${post.id}`,
-      communityUrl,
-      logoUrl: `${communityUrl}/logo-full.png`,
-      date: post.reviewedAt ?? post.createdAt,
-    });
-
-    await this.mail.send({ to: email, subject, html, text });
-  }
-
-  // --- Admin stats ---
-
-  async stats(limit = 50): Promise<{ mode: PostEmailMode; posts: PostEmailStats[] }> {
-    const rows = (await this.queue
-      .createQueryBuilder('q')
-      .innerJoin('q.post', 'post')
-      .select('q.postId', 'postId')
-      .addSelect('post.content', 'content')
-      .addSelect('post.notifiedAt', 'notifiedAt')
-      .addSelect(`SUM(q.status = '${PostEmailStatus.QUEUED}')`, 'queued')
-      .addSelect(`SUM(q.status = '${PostEmailStatus.SENT}')`, 'sent')
-      .addSelect(`SUM(q.status = '${PostEmailStatus.FAILED}')`, 'failed')
-      .addSelect(`SUM(q.status = '${PostEmailStatus.SKIPPED}')`, 'skipped')
-      .groupBy('q.postId')
-      .addGroupBy('post.content')
-      .addGroupBy('post.notifiedAt')
-      .orderBy('q.postId', 'DESC')
-      .limit(limit)
-      .getRawMany()) as {
-      postId: string;
-      content: string;
-      notifiedAt: Date | null;
-      queued: string;
-      sent: string;
-      failed: string;
-      skipped: string;
-    }[];
-
-    return {
-      mode: this.mode,
-      posts: rows.map((r) => ({
-        postId: Number(r.postId),
-        title: postTitle(r.content),
-        notifiedAt: r.notifiedAt ? new Date(r.notifiedAt).toISOString() : null,
-        queued: Number(r.queued),
-        sent: Number(r.sent),
-        failed: Number(r.failed),
-        skipped: Number(r.skipped),
-      })),
-    };
   }
 }

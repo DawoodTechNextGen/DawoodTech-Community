@@ -18,6 +18,8 @@ export declare class User {
     role: UserRole;
     status: UserStatus;
     isEmailVerified: boolean;
+    verificationEmailSentAt: Date | null;
+    verificationEmailAttempts: number;
     createdAt: Date;
     updatedAt: Date;
 }

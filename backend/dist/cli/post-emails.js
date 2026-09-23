@@ -10,10 +10,11 @@ import { NestFactory } from '@nestjs/core';
 import { getRepositoryToken } from '@nestjs/typeorm';
 import configuration from '../config/configuration.js';
 import { DatabaseModule } from '../database/database.module.js';
-import { Post } from '../database/entities/post.entity.js';
+import { Post, PostStatus } from '../database/entities/post.entity.js';
 import { MailService } from '../mail/mail.service.js';
 import { ActivityEmailsModule } from '../activity-emails/activity-emails.module.js';
 import { ActivityEmailsService } from '../activity-emails/activity-emails.service.js';
+import { DigestEmailsService } from '../post-emails/digest-emails.service.js';
 import { PostEmailsModule } from '../post-emails/post-emails.module.js';
 import { PostEmailsService } from '../post-emails/post-emails.service.js';
 let PostEmailsCliModule = class PostEmailsCliModule {
@@ -36,15 +37,22 @@ async function main() {
     });
     try {
         const postEmails = app.get(PostEmailsService);
+        const digests = app.get(DigestEmailsService);
         switch (command) {
             case 'worker': {
+                const activity = await app.get(ActivityEmailsService).processBatch();
+                const legacy = await postEmails.processBatch();
+                await digests.buildDueDigest();
+                const digest = await digests.processBatch();
                 const batches = [
-                    ['New-post', await postEmails.processBatch()],
-                    ['Activity', await app.get(ActivityEmailsService).processBatch()],
+                    ['Activity', activity],
+                    ['Post', legacy],
+                    ['Digest', digest],
                 ];
                 for (const [label, result] of batches) {
-                    if (!result)
+                    if (!result || result.sent + result.failed + result.retrying + result.skipped === 0) {
                         continue;
+                    }
                     logger.log(`${label} batch done — sent ${result.sent}, retrying ${result.retrying}, ` +
                         `failed ${result.failed}, skipped ${result.skipped}`);
                 }
@@ -57,26 +65,35 @@ async function main() {
                 logger.log(`${recipients.length} recipients (mode: ${postEmails.mode})`);
                 return 0;
             }
+            case 'digest': {
+                await digests.buildDueDigest(true);
+                return 0;
+            }
             case 'test': {
-                const postId = Number(args[0]);
-                const to = args[1] ?? app.get(ConfigService).get('postEmails.testRecipient');
-                if (!postId || !to) {
-                    logger.error('Usage: test <postId> [email]  (or set POST_EMAIL_TEST_RECIPIENT)');
+                const to = args[0] ?? app.get(ConfigService).get('postEmails.testRecipient');
+                if (!to) {
+                    logger.error('Usage: test [email]  (or set POST_EMAIL_TEST_RECIPIENT)');
                     return 1;
                 }
-                const post = await app
-                    .get(getRepositoryToken(Post))
-                    .findOne({ where: { id: postId }, relations: { author: true, media: true } });
-                if (!post) {
-                    logger.error(`Post ${postId} not found`);
+                let posts = await digests.pendingPosts();
+                if (posts.length === 0) {
+                    posts = (await app.get(getRepositoryToken(Post)).find({
+                        where: { status: PostStatus.APPROVED },
+                        relations: { author: true, media: true },
+                        order: { reviewedAt: 'DESC', id: 'DESC' },
+                        take: 3,
+                    })).reverse();
+                }
+                if (posts.length === 0) {
+                    logger.error('No approved posts to preview.');
                     return 1;
                 }
-                await postEmails.sendForPost(post, to, 'Test recipient');
-                logger.log(`Sent post ${postId}'s notification to ${to}`);
+                await postEmails.sendDigest(posts, to, 'Test recipient', new Date());
+                logger.log(`Sent a preview digest of ${posts.length} post(s) to ${to}`);
                 return 0;
             }
             default:
-                logger.error(`Unknown command "${command}" — use worker, recipients or test`);
+                logger.error(`Unknown command "${command}" — use worker, recipients, digest or test`);
                 return 1;
         }
     }

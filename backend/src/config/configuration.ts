@@ -61,6 +61,14 @@ export default () => ({
     batchSize: parseInt(process.env.POST_EMAIL_BATCH_SIZE ?? '50', 10),
     delayMs: parseInt(process.env.POST_EMAIL_DELAY_MS ?? '1000', 10),
     maxAttempts: 3,
+    // Most queued (new-post + activity) emails the cron may send in any rolling
+    // hour. Keep it below the mail server's own hourly cap so signup, password
+    // reset and verification emails always have room left.
+    hourlyLimit: parseInt(process.env.EMAIL_HOURLY_LIMIT ?? '20', 10),
+    // New posts go out as one daily digest, built on the first cron run after
+    // this hour (0-23) in DIGEST_TIMEZONE.
+    digestHour: parseInt(process.env.DIGEST_HOUR ?? '9', 10),
+    digestTimeZone: process.env.DIGEST_TIMEZONE || 'Asia/Karachi',
     // Like/comment/reply emails to community members. Same modes as above; in
     // test mode they're all redirected to POST_EMAIL_TEST_RECIPIENT.
     activityMode: (process.env.ACTIVITY_EMAIL_MODE ??

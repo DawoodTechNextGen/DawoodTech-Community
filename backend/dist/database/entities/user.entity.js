@@ -30,6 +30,8 @@ let User = class User {
     role;
     status;
     isEmailVerified;
+    verificationEmailSentAt;
+    verificationEmailAttempts;
     createdAt;
     updatedAt;
 };
@@ -75,6 +77,14 @@ __decorate([
     Column({ name: 'is_email_verified', default: false }),
     __metadata("design:type", Boolean)
 ], User.prototype, "isEmailVerified", void 0);
+__decorate([
+    Column({ name: 'verification_email_sent_at', type: 'datetime', nullable: true }),
+    __metadata("design:type", Object)
+], User.prototype, "verificationEmailSentAt", void 0);
+__decorate([
+    Column({ name: 'verification_email_attempts', type: 'int', default: 0 }),
+    __metadata("design:type", Number)
+], User.prototype, "verificationEmailAttempts", void 0);
 __decorate([
     CreateDateColumn({ name: 'created_at' }),
     __metadata("design:type", Date)

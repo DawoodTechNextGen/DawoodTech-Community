@@ -4,16 +4,28 @@ import { Mail, RefreshCw } from "lucide-react";
 import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
 import { api } from "@/lib/api-client";
-import { formatRelativeTime } from "@/lib/format";
 import type { PostEmailStatsResponse } from "@/lib/types";
 
 const MODE_LABELS: Record<PostEmailStatsResponse["mode"], string | null> = {
   live: null,
-  test: "Test mode: only the test address is emailed",
+  test: "Test mode: digests go only to the test address",
   dry_run: "Dry run: recipients are logged, nothing is sent",
 };
 
-/** Per-post counts from the new-post email queue (queued / sent / failed). */
+function formatHour(hour: number): string {
+  const suffix = hour < 12 ? "AM" : "PM";
+  return `${hour % 12 === 0 ? 12 : hour % 12}:00 ${suffix}`;
+}
+
+function formatDay(day: string): string {
+  return new Date(`${day}T12:00:00`).toLocaleDateString("en-US", {
+    weekday: "short",
+    month: "short",
+    day: "numeric",
+  });
+}
+
+/** Daily digest status: posts waiting for the next one, and recent digests' send counts. */
 export function PostEmailStatsPanel() {
   const [data, setData] = useState<PostEmailStatsResponse | null>(null);
   const [error, setError] = useState(false);
@@ -47,7 +59,7 @@ export function PostEmailStatsPanel() {
     <section className="mt-8">
       <div className="mb-3 flex items-center gap-2">
         <Mail className="h-4 w-4 text-brand" />
-        <h2 className="text-sm font-semibold">New-post email notifications</h2>
+        <h2 className="text-sm font-semibold">Daily email digest</h2>
         <button
           type="button"
           onClick={load}
@@ -67,48 +79,76 @@ export function PostEmailStatsPanel() {
 
       {error ? (
         <p className="text-sm text-foreground/50">Couldn&apos;t load email stats.</p>
-      ) : !data ? null : data.posts.length === 0 ? (
-        <p className="text-sm text-foreground/50">No post emails have been queued yet.</p>
-      ) : (
-        <ul className="divide-y divide-black/5 overflow-hidden rounded-2xl border border-black/5 bg-white/60 dark:divide-white/10 dark:border-white/10 dark:bg-white/5">
-          {data.posts.map((p) => (
-            <li key={p.postId} className="flex flex-wrap items-center gap-x-4 gap-y-1.5 px-4 py-3">
-              <div className="min-w-0 flex-1 basis-48">
-                <Link
-                  href={`/post/${p.postId}`}
-                  className="block truncate text-sm font-medium hover:underline"
-                >
-                  {p.title}
-                </Link>
-                {p.notifiedAt && (
-                  <span className="text-xs text-foreground/40">
-                    Queued {formatRelativeTime(p.notifiedAt)}
-                  </span>
-                )}
-              </div>
-              <div className="flex gap-1.5 text-xs font-medium">
-                <Count label="queued" value={p.queued} className="bg-brand/10 text-brand" />
-                <Count
-                  label="sent"
-                  value={p.sent}
-                  className="bg-emerald-500/10 text-emerald-600 dark:text-emerald-400"
-                />
-                <Count
-                  label="failed"
-                  value={p.failed}
-                  className="bg-red-500/10 text-red-600 dark:text-red-400"
-                />
-                {p.skipped > 0 && (
-                  <Count
-                    label="skipped"
-                    value={p.skipped}
-                    className="bg-black/5 text-foreground/60 dark:bg-white/10"
-                  />
-                )}
-              </div>
-            </li>
-          ))}
-        </ul>
+      ) : !data ? null : (
+        <div className="space-y-4">
+          <div className="rounded-2xl border border-black/5 bg-white/60 px-4 py-3 dark:border-white/10 dark:bg-white/5">
+            <p className="text-sm font-medium">
+              Next digest: {formatHour(data.digestHour)}{" "}
+              <span className="font-normal text-foreground/50">({data.timeZone})</span>
+            </p>
+            {data.pendingPosts.length === 0 ? (
+              <p className="mt-1 text-xs text-foreground/50">No posts waiting yet.</p>
+            ) : (
+              <>
+                <p className="mt-1 text-xs text-foreground/50">
+                  {data.pendingPosts.length} post{data.pendingPosts.length > 1 ? "s" : ""} waiting:
+                </p>
+                <ul className="mt-1.5 space-y-1">
+                  {data.pendingPosts.map((p) => (
+                    <li key={p.postId} className="truncate text-sm">
+                      <Link href={`/post/${p.postId}`} className="hover:underline">
+                        {p.title}
+                      </Link>
+                    </li>
+                  ))}
+                </ul>
+              </>
+            )}
+            {data.legacyQueued > 0 && (
+              <p className="mt-2 text-xs text-foreground/50">
+                {data.legacyQueued} earlier one-per-post email{data.legacyQueued > 1 ? "s" : ""} still
+                sending.
+              </p>
+            )}
+          </div>
+
+          {data.digests.length === 0 ? (
+            <p className="text-sm text-foreground/50">No digests have been sent yet.</p>
+          ) : (
+            <ul className="divide-y divide-black/5 overflow-hidden rounded-2xl border border-black/5 bg-white/60 dark:divide-white/10 dark:border-white/10 dark:bg-white/5">
+              {data.digests.map((d) => (
+                <li key={d.id} className="flex flex-wrap items-center gap-x-4 gap-y-1.5 px-4 py-3">
+                  <div className="min-w-0 flex-1 basis-40">
+                    <p className="text-sm font-medium">{formatDay(d.day)}</p>
+                    <span className="text-xs text-foreground/40">
+                      {d.postCount} post{d.postCount > 1 ? "s" : ""}
+                    </span>
+                  </div>
+                  <div className="flex gap-1.5 text-xs font-medium">
+                    <Count label="queued" value={d.queued} className="bg-brand/10 text-brand" />
+                    <Count
+                      label="sent"
+                      value={d.sent}
+                      className="bg-emerald-500/10 text-emerald-600 dark:text-emerald-400"
+                    />
+                    <Count
+                      label="failed"
+                      value={d.failed}
+                      className="bg-red-500/10 text-red-600 dark:text-red-400"
+                    />
+                    {d.skipped > 0 && (
+                      <Count
+                        label="skipped"
+                        value={d.skipped}
+                        className="bg-black/5 text-foreground/60 dark:bg-white/10"
+                      />
+                    )}
+                  </div>
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
       )}
     </section>
   );

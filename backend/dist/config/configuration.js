@@ -51,6 +51,9 @@ export default () => ({
         batchSize: parseInt(process.env.POST_EMAIL_BATCH_SIZE ?? '50', 10),
         delayMs: parseInt(process.env.POST_EMAIL_DELAY_MS ?? '1000', 10),
         maxAttempts: 3,
+        hourlyLimit: parseInt(process.env.EMAIL_HOURLY_LIMIT ?? '20', 10),
+        digestHour: parseInt(process.env.DIGEST_HOUR ?? '9', 10),
+        digestTimeZone: process.env.DIGEST_TIMEZONE || 'Asia/Karachi',
         activityMode: (process.env.ACTIVITY_EMAIL_MODE ??
             process.env.POST_EMAIL_MODE ??
             'dry_run'),

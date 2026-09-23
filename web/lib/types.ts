@@ -86,10 +86,11 @@ export interface PaginatedNotifications {
   nextCursor: string | null;
 }
 
-export interface PostEmailStats {
-  postId: number;
-  title: string;
-  notifiedAt: string | null;
+export interface DigestStats {
+  id: number;
+  /** Local calendar day, "YYYY-MM-DD". */
+  day: string;
+  postCount: number;
   queued: number;
   sent: number;
   failed: number;
@@ -98,5 +99,9 @@ export interface PostEmailStats {
 
 export interface PostEmailStatsResponse {
   mode: "live" | "test" | "dry_run";
-  posts: PostEmailStats[];
+  digestHour: number;
+  timeZone: string;
+  pendingPosts: { postId: number; title: string }[];
+  legacyQueued: number;
+  digests: DigestStats[];
 }

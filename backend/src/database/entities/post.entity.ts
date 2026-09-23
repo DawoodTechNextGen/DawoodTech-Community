@@ -45,7 +45,11 @@ export class Post {
   @Column({ name: 'reviewed_at', type: 'datetime', nullable: true })
   reviewedAt!: Date | null;
 
-  /** When the "new post" email to TaskDesk interns was queued; set once, never reset. */
+  /** Approved with "email everyone" ticked — goes into the next daily digest. */
+  @Column({ name: 'notify_by_email', type: 'boolean', default: false })
+  notifyByEmail!: boolean;
+
+  /** When the post went out by email (in a digest); set once, never reset. */
   @Column({ name: 'notified_at', type: 'datetime', nullable: true })
   notifiedAt!: Date | null;
 

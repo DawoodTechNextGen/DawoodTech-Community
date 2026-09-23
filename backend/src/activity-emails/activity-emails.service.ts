@@ -23,6 +23,7 @@ import {
 } from '../notifications/notification.events.js';
 import {
   errorMessage,
+  hourlyAllowance,
   normalizeEmail,
   sleep,
   toAbsoluteUrl,
@@ -205,6 +206,15 @@ export class ActivityEmailsService {
     const maxAttempts = this.config.get<number>('postEmails.maxAttempts') ?? 3;
     const result: WorkerRunResult = { sent: 0, failed: 0, retrying: 0, skipped: 0 };
 
+    const allowance = await hourlyAllowance(
+      this.dataSource,
+      this.config.get<number>('postEmails.hourlyLimit') ?? 20,
+    );
+    if (allowance === 0) {
+      this.logger.log('Hourly email limit reached — activity emails wait for a later run.');
+      return result;
+    }
+
     const rows = await this.queue.find({
       where: { status: PostEmailStatus.QUEUED },
       order: { id: 'ASC' },
@@ -216,6 +226,7 @@ export class ActivityEmailsService {
     let sentAny = false;
 
     for (const row of rows) {
+      if (result.sent >= allowance) break;
       if (handled.has(Number(row.id))) continue;
 
       // Likes for the same post+recipient (and follows of the same recipient)
@@ -301,9 +312,10 @@ export class ActivityEmailsService {
       }
       try {
         await this.send(active, post, comment);
+        const sentAt = new Date();
         for (const item of active) {
           item.status = PostEmailStatus.SENT;
-          item.sentAt = new Date();
+          item.sentAt = sentAt;
           item.error = null;
         }
         result.sent++;

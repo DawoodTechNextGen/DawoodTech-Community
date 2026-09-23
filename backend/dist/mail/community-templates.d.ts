@@ -10,15 +10,18 @@ interface CommonEmailInput {
     logoUrl: string;
     date: Date;
 }
-export interface NewPostEmailInput extends CommonEmailInput {
+export interface DigestPost {
     title: string;
     authorName: string;
     authorAvatarUrl: string | null;
     excerpt: string;
     imageUrl: string | null;
-    postUrl: string;
+    url: string;
 }
-export declare function newPostTemplate(input: NewPostEmailInput): RenderedEmail;
+export interface DigestEmailInput extends CommonEmailInput {
+    posts: DigestPost[];
+}
+export declare function digestTemplate(input: DigestEmailInput): RenderedEmail;
 export interface ActivityPostPreview {
     title: string;
     label: string;

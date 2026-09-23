@@ -107,14 +107,20 @@ Open `http://localhost:3001`.
 |---|---|
 | `NEXT_PUBLIC_API_URL` | Base URL of the backend API |
 
-## New-post emails to interns and community members
+## Verification emails that fail at signup
 
-When an admin approves a post with **"Email all interns and members about this post"** checked (the default), every registered TaskDesk intern and every community member gets one email linking to it.
+Signup never fails because of mail. If the verification email can't be sent (mail server busy or over its hourly cap), the account is still created and `users.verification_email_sent_at` stays empty. The app then retries those emails by itself, right after it starts and every 10 minutes while it runs, within `EMAIL_HOURLY_LIMIT`, giving up on an address after 3 failed tries. Nothing to add to cron. The login page also lets members resend the email themselves.
 
-- **Recipients:** read-only query against TaskDesk's database (`TASKDESK_DB_*`). This covers every row in `registrations` (any status) plus `users` with `user_role` 2 (intern) or 6 (candidate). Active, email-verified community members are added on top. Emails are trimmed and lowercased, then de-duplicated, so someone in both gets one email. Invalid addresses and the post's own author are skipped.
-- **Once per post:** `posts.notified_at` is claimed atomically on first approval, so re-approving after an edit, a double-click or a retry never re-sends. Queue rows are also unique per `(post_id, email)`.
-- **Queue + worker:** approval only fills `post_email_queue`. A cron job sends `POST_EMAIL_BATCH_SIZE` emails per run (default 50) with `POST_EMAIL_DELAY_MS` between them, one email per recipient. A failed send is retried on later runs and marked `failed` after 3 attempts. A MySQL advisory lock stops overlapping runs from double-sending.
-- **Admin:** queued / sent / failed counts per post are shown under the review queue.
+## Daily digest of new posts to interns and community members
+
+New posts are emailed as **one daily digest** per person, not one email per post. When an admin approves a post with **"Include in the daily email digest"** checked (the default), the post is only marked. Once a day, on the first cron run after `DIGEST_HOUR` (default 9, in `DIGEST_TIMEZONE`, default `Asia/Karachi`), every marked post goes into that day's digest and one email per recipient is queued. However many posts were approved, each person gets one email a day. It lists up to 10 posts, then "and N more" with a link to the feed.
+
+- **Recipients:** read-only query against TaskDesk's database (`TASKDESK_DB_*`). This covers every row in `registrations` (any status) plus `users` with `user_role` 2 (intern) or 6 (candidate). Active, email-verified community members are added on top. Emails are trimmed and lowercased, then de-duplicated, so someone in both gets one email. Invalid addresses are skipped.
+- **Once per post, once per day:** building a digest sets `posts.notified_at` on its posts, so re-approving after an edit never re-sends. `email_digests.digest_key` (the local date) is unique, so a day can never get two digests. A day with no new posts still records an empty digest, so a post approved after that day's digest waits for tomorrow's.
+- **Queue + worker:** a cron job sends up to `POST_EMAIL_BATCH_SIZE` queued emails per run with `POST_EMAIL_DELAY_MS` between them. A failed send is retried on later runs and marked `failed` after 3 attempts. MySQL advisory locks stop overlapping runs from double-building or double-sending.
+- **Hourly limit:** `EMAIL_HOURLY_LIMIT` (default 20) caps how many queued emails (digest + like/comment/follow together) go out in any rolling hour. Set it well below your mail server's own hourly cap so signup, verification and password-reset emails, which are sent straight away, always have room. Like/comment/follow emails get first pick; the digest uses what's left and simply waits for later runs.
+- **Admin:** the review queue page shows the next digest time, the posts waiting for it, and queued / sent / failed counts for recent digests.
+- **Older queue:** emails queued one-per-post before the digest existed (`post_email_queue`) are still sent by the same cron until that queue is empty.
 
 **Setup (production):**
 
@@ -133,9 +139,10 @@ When an admin approves a post with **"Email all interns and members about this p
 | Step | How |
 |---|---|
 | See the recipient list | `node dist/cli/post-emails.js recipients` (sends nothing) |
-| Preview one email in your inbox | `node dist/cli/post-emails.js test <postId> you@example.com` |
-| Dry-run the approve flow | `POST_EMAIL_MODE=dry_run`: approving logs "Post N would be emailed to X recipients: …" in the app log. Nothing is queued and `notified_at` stays empty. |
-| Full pipeline to only you | `POST_EMAIL_MODE=test` + `POST_EMAIL_TEST_RECIPIENT=you@example.com`: approving queues just your address and the cron worker sends it |
+| Preview the digest in your inbox | `node dist/cli/post-emails.js test you@example.com`: the posts waiting for the next digest, or the latest 3 |
+| Build today's digest now | `node dist/cli/post-emails.js digest`: doesn't wait for `DIGEST_HOUR`, still only once per day |
+| Dry-run | `POST_EMAIL_MODE=dry_run`: the day's digest logs "Digest … would go to X recipients: …" in the cron log. Nothing is queued and the posts stay unsent. |
+| Full pipeline to only you | `POST_EMAIL_MODE=test` + `POST_EMAIL_TEST_RECIPIENT=you@example.com`: the digest is queued for just your address and the cron worker sends it; the posts stay unsent for the real digest |
 | Go live | `POST_EMAIL_MODE=live`, then restart the app |
 
 ## Like / comment / follow emails to community members

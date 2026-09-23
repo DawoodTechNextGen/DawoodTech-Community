@@ -10,31 +10,86 @@ var __metadata = (this && this.__metadata) || function (k, v) {
 var __param = (this && this.__param) || function (paramIndex, decorator) {
     return function (target, key) { decorator(target, key, paramIndex); }
 };
-import { ConflictException, ForbiddenException, Injectable, UnauthorizedException, } from '@nestjs/common';
+var AuthService_1;
+import { ConflictException, ForbiddenException, Injectable, Logger, UnauthorizedException, } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { JwtService } from '@nestjs/jwt';
-import { InjectRepository } from '@nestjs/typeorm';
+import { InjectDataSource, InjectRepository } from '@nestjs/typeorm';
 import * as bcrypt from 'bcryptjs';
 import { randomUUID } from 'node:crypto';
-import { MoreThan, Repository } from 'typeorm';
+import { DataSource, IsNull, LessThan, MoreThan, Repository } from 'typeorm';
 import { MailService } from '../mail/mail.service.js';
+import { errorMessage, hourlyAllowance, withAdvisoryLock, } from '../post-emails/email-worker-utils.js';
 import { resetPasswordTemplate, verifyEmailTemplate } from '../mail/templates.js';
 import { RefreshToken } from '../database/entities/refresh-token.entity.js';
 import { User, UserRole, UserStatus } from '../database/entities/user.entity.js';
 const BCRYPT_ROUNDS = 12;
 const ACTION_TOKEN_EXPIRES_IN = '1h';
-let AuthService = class AuthService {
+const VERIFICATION_RETRY_EVERY_MS = 10 * 60 * 1000;
+const VERIFICATION_MAX_ATTEMPTS = 3;
+const VERIFICATION_RETRY_LOCK = 'dawoodtech_community_verification_retry';
+let AuthService = AuthService_1 = class AuthService {
     users;
     refreshTokens;
     jwt;
     config;
     mail;
-    constructor(users, refreshTokens, jwt, config, mail) {
+    dataSource;
+    logger = new Logger(AuthService_1.name);
+    retryTimer = null;
+    constructor(users, refreshTokens, jwt, config, mail, dataSource) {
         this.users = users;
         this.refreshTokens = refreshTokens;
         this.jwt = jwt;
         this.config = config;
         this.mail = mail;
+        this.dataSource = dataSource;
+    }
+    onApplicationBootstrap() {
+        void this.sendPendingVerificationEmails();
+        this.retryTimer = setInterval(() => void this.sendPendingVerificationEmails(), VERIFICATION_RETRY_EVERY_MS);
+        this.retryTimer.unref();
+    }
+    onModuleDestroy() {
+        if (this.retryTimer)
+            clearInterval(this.retryTimer);
+    }
+    async sendPendingVerificationEmails() {
+        try {
+            const sent = await withAdvisoryLock(this.dataSource, VERIFICATION_RETRY_LOCK, async () => {
+                const allowance = await hourlyAllowance(this.dataSource, this.config.get('postEmails.hourlyLimit') ?? 20);
+                if (allowance === 0)
+                    return 0;
+                const pending = await this.users.find({
+                    where: {
+                        isEmailVerified: false,
+                        status: UserStatus.ACTIVE,
+                        verificationEmailSentAt: IsNull(),
+                        verificationEmailAttempts: LessThan(VERIFICATION_MAX_ATTEMPTS),
+                    },
+                    order: { id: 'ASC' },
+                    take: allowance,
+                });
+                let count = 0;
+                for (const user of pending) {
+                    try {
+                        await this.sendVerificationEmail(user);
+                        count++;
+                    }
+                    catch (err) {
+                        this.logger.warn(`Retrying the verification email to ${user.email} failed: ${errorMessage(err)}`);
+                    }
+                }
+                if (count > 0)
+                    this.logger.log(`Sent ${count} pending verification email(s).`);
+                return count;
+            });
+            return sent ?? 0;
+        }
+        catch (err) {
+            this.logger.error(`Couldn't send pending verification emails: ${errorMessage(err)}`);
+            return 0;
+        }
     }
     async signup(dto) {
         const existing = await this.users.findOne({
@@ -51,7 +106,12 @@ let AuthService = class AuthService {
             passwordHash,
             role: UserRole.INTERN,
         }));
-        await this.sendVerificationEmail(user);
+        try {
+            await this.sendVerificationEmail(user);
+        }
+        catch (err) {
+            this.logger.error(`Could not send the verification email to ${user.email}: ${err instanceof Error ? err.message : String(err)}`);
+        }
         return user;
     }
     async login(dto) {
@@ -76,7 +136,14 @@ let AuthService = class AuthService {
         const token = await this.signActionToken(user.id, 'verify-email');
         const link = `${this.config.get('frontendUrl')}/verify-email?token=${token}`;
         const { subject, html } = verifyEmailTemplate(user.fullName, link);
-        await this.mail.send({ to: user.email, subject, html });
+        try {
+            await this.mail.send({ to: user.email, subject, html });
+        }
+        catch (err) {
+            await this.users.increment({ id: user.id }, 'verificationEmailAttempts', 1);
+            throw err;
+        }
+        await this.users.update({ id: user.id }, { verificationEmailSentAt: new Date() });
     }
     async resendVerification(email) {
         const user = await this.users.findOneBy({ email });
@@ -204,15 +271,17 @@ let AuthService = class AuthService {
         return { accessToken, refreshToken };
     }
 };
-AuthService = __decorate([
+AuthService = AuthService_1 = __decorate([
     Injectable(),
     __param(0, InjectRepository(User)),
     __param(1, InjectRepository(RefreshToken)),
+    __param(5, InjectDataSource()),
     __metadata("design:paramtypes", [Repository,
         Repository,
         JwtService,
         ConfigService,
-        MailService])
+        MailService,
+        DataSource])
 ], AuthService);
 export { AuthService };
 function addDuration(base, duration) {

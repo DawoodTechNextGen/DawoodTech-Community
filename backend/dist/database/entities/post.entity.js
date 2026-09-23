@@ -24,6 +24,7 @@ let Post = class Post {
     status;
     reviewedBy;
     reviewedAt;
+    notifyByEmail;
     notifiedAt;
     media;
     createdAt;
@@ -60,6 +61,10 @@ __decorate([
     Column({ name: 'reviewed_at', type: 'datetime', nullable: true }),
     __metadata("design:type", Object)
 ], Post.prototype, "reviewedAt", void 0);
+__decorate([
+    Column({ name: 'notify_by_email', type: 'boolean', default: false }),
+    __metadata("design:type", Boolean)
+], Post.prototype, "notifyByEmail", void 0);
 __decorate([
     Column({ name: 'notified_at', type: 'datetime', nullable: true }),
     __metadata("design:type", Object)

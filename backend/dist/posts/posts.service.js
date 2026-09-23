@@ -13,14 +13,13 @@ var __param = (this && this.__param) || function (paramIndex, decorator) {
 import { ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { IsNull, Repository } from 'typeorm';
 import { CommentsService } from '../comments/comments.service.js';
 import { FollowsService } from '../follows/follows.service.js';
 import { LikesService } from '../likes/likes.service.js';
 import { PostMedia } from '../database/entities/post-media.entity.js';
 import { Post, PostStatus } from '../database/entities/post.entity.js';
 import { NotificationEvents } from '../notifications/notification.events.js';
-import { PostEmailEvents } from '../post-emails/post-email.events.js';
 import { toPostResponse } from './post.mapper.js';
 const PAGE_SIZE = 20;
 let PostsService = class PostsService {
@@ -161,9 +160,7 @@ let PostsService = class PostsService {
     }
     async approve(id, adminId, notifyInterns = true) {
         const response = await this.review(id, adminId, PostStatus.APPROVED);
-        if (notifyInterns) {
-            this.events.emit(PostEmailEvents.PostPublished, { postId: id });
-        }
+        await this.posts.update({ id, notifiedAt: IsNull() }, { notifyByEmail: notifyInterns });
         return response;
     }
     async reject(id, adminId) {

@@ -52,6 +52,16 @@ export class User {
   @Column({ name: 'is_email_verified', default: false })
   isEmailVerified!: boolean;
 
+  /** Last time a verification email actually went out. Null while unverified
+   *  means it never did (e.g. the mail server was busy at signup), so the app
+   *  retries it on startup and every few minutes. */
+  @Column({ name: 'verification_email_sent_at', type: 'datetime', nullable: true })
+  verificationEmailSentAt!: Date | null;
+
+  /** Failed verification-email sends; retries stop after a few. */
+  @Column({ name: 'verification_email_attempts', type: 'int', default: 0 })
+  verificationEmailAttempts!: number;
+
   @CreateDateColumn({ name: 'created_at' })
   createdAt!: Date;
 

@@ -1,4 +1,5 @@
-import { activityTemplate, newPostTemplate } from '../mail/community-templates.js';
+import { activityTemplate, digestTemplate } from '../mail/community-templates.js';
+import { localDayAndHour } from './digest-schedule.js';
 import { postExcerpt, postTitle } from './post-summary.js';
 import { dedupeRecipients } from './taskdesk-recipients.service.js';
 
@@ -40,15 +41,19 @@ describe('post summary + template', () => {
   });
 
   it('escapes every interpolated value in the HTML body', () => {
-    const { subject, html, text } = newPostTemplate({
+    const { subject, html, text } = digestTemplate({
       recipientName: '<script>x</script>',
       recipientEmail: 'a@b.co',
-      title: 'A & B',
-      authorName: '"Mallory"',
-      authorAvatarUrl: null,
-      excerpt: '<img src=x onerror=alert(1)>',
-      imageUrl: 'https://api.test/uploads/posts/1.png?a=1&b="2"',
-      postUrl: 'https://community.test/post/1',
+      posts: [
+        {
+          title: 'A & B',
+          authorName: '"Mallory"',
+          authorAvatarUrl: null,
+          excerpt: '<img src=x onerror=alert(1)>',
+          imageUrl: 'https://api.test/uploads/posts/1.png?a=1&b="2"',
+          url: 'https://community.test/post/1',
+        },
+      ],
       communityUrl: 'https://community.test',
       logoUrl: 'https://community.test/logo-full.png',
       date: new Date('2026-09-23T10:00:00Z'),
@@ -108,5 +113,53 @@ describe('activity template', () => {
     });
     expect(html).toContain('Got hired!');
     expect(html).toContain('Your post');
+  });
+});
+
+describe('daily digest', () => {
+  const post = (n: number) => ({
+    title: `Post ${n}`,
+    authorName: `Author ${n}`,
+    authorAvatarUrl: null,
+    excerpt: '',
+    imageUrl: null,
+    url: `https://community.test/post/${n}`,
+  });
+  const common = {
+    recipientName: 'Ali',
+    recipientEmail: 'ali@example.com',
+    communityUrl: 'https://community.test',
+    logoUrl: 'https://community.test/logo-full.png',
+    date: new Date('2026-09-23T10:00:00Z'),
+  };
+
+  it('puts every post of the day in one email', () => {
+    const { subject, html, text } = digestTemplate({ ...common, posts: [post(1), post(2), post(3)] });
+    expect(subject).toBe('3 new posts in DawoodTech Community today');
+    expect(html).toContain('Daily digest');
+    for (const n of [1, 2, 3]) {
+      expect(html).toContain(`https://community.test/post/${n}`);
+      expect(text).toContain(`Post ${n}`);
+    }
+  });
+
+  it('shows the first 10 posts and links to the feed for the rest', () => {
+    const posts = Array.from({ length: 13 }, (_, i) => post(i + 1));
+    const { html } = digestTemplate({ ...common, posts });
+    expect(html).toContain('https://community.test/post/10"');
+    expect(html).not.toContain('https://community.test/post/11"');
+    expect(html).toContain('And 3 more new posts');
+  });
+
+  it('works out the local day and hour in the digest time zone', () => {
+    // 20:30 UTC on the 23rd is 01:30 on the 24th in Pakistan (UTC+5).
+    expect(localDayAndHour(new Date('2026-09-23T20:30:00Z'), 'Asia/Karachi')).toEqual({
+      day: '2026-09-24',
+      hour: 1,
+    });
+    expect(localDayAndHour(new Date('2026-09-23T03:59:00Z'), 'Asia/Karachi')).toEqual({
+      day: '2026-09-23',
+      hour: 8,
+    });
   });
 });

@@ -21,6 +21,19 @@ export async function withAdvisoryLock(dataSource, lockName, fn) {
         await runner.release();
     }
 }
+export async function emailsSentInLastHour(dataSource) {
+    const since = new Date(Date.now() - 60 * 60 * 1000);
+    const [row] = (await dataSource.query(`SELECT
+       (SELECT COUNT(*) FROM post_email_queue WHERE sent_at >= ?) +
+       (SELECT COUNT(*) FROM digest_email_queue WHERE sent_at >= ?) +
+       (SELECT COUNT(*) FROM users WHERE verification_email_sent_at >= ?) +
+       (SELECT COUNT(DISTINCT recipient_user_id, sent_at) FROM activity_email_queue WHERE sent_at >= ?)
+     AS sent`, [since, since, since, since]));
+    return Number(row?.sent ?? 0);
+}
+export async function hourlyAllowance(dataSource, hourlyLimit) {
+    return Math.max(0, hourlyLimit - (await emailsSentInLastHour(dataSource)));
+}
 export function toAbsoluteUrl(apiUrl, url) {
     if (!url)
         return null;

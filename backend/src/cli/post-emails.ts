@@ -1,11 +1,15 @@
 /**
  * Community email CLI — run from backend/ so .env is picked up.
  *
- *   node dist/cli/post-emails.js                     send one queued batch of new-post and
- *                                                    like/comment emails (what cron runs)
- *   node dist/cli/post-emails.js recipients          list who would be emailed (sends nothing)
- *   node dist/cli/post-emails.js test <postId> [to]  send one post's email to a single address
- *                                                    (defaults to POST_EMAIL_TEST_RECIPIENT)
+ *   node dist/cli/post-emails.js               what cron runs: send queued like/comment/follow
+ *                                              emails, build the daily digest once it's due,
+ *                                              and send queued digest emails
+ *   node dist/cli/post-emails.js recipients    list who gets the digest (sends nothing)
+ *   node dist/cli/post-emails.js digest        build today's digest now, without waiting for
+ *                                              DIGEST_HOUR (still only once per day)
+ *   node dist/cli/post-emails.js test [to]     email a preview digest to one address (defaults
+ *                                              to POST_EMAIL_TEST_RECIPIENT): the posts waiting
+ *                                              for the next digest, or the latest 3 if none
  */
 import { Logger, Module } from '@nestjs/common';
 import { ConfigModule, ConfigService } from '@nestjs/config';
@@ -14,10 +18,11 @@ import { getRepositoryToken } from '@nestjs/typeorm';
 import type { Repository } from 'typeorm';
 import configuration from '../config/configuration.js';
 import { DatabaseModule } from '../database/database.module.js';
-import { Post } from '../database/entities/post.entity.js';
+import { Post, PostStatus } from '../database/entities/post.entity.js';
 import { MailService } from '../mail/mail.service.js';
 import { ActivityEmailsModule } from '../activity-emails/activity-emails.module.js';
 import { ActivityEmailsService } from '../activity-emails/activity-emails.service.js';
+import { DigestEmailsService } from '../post-emails/digest-emails.service.js';
 import { PostEmailsModule } from '../post-emails/post-emails.module.js';
 import { PostEmailsService } from '../post-emails/post-emails.service.js';
 
@@ -41,15 +46,26 @@ async function main(): Promise<number> {
 
   try {
     const postEmails = app.get(PostEmailsService);
+    const digests = app.get(DigestEmailsService);
 
     switch (command) {
       case 'worker': {
+        // Activity emails (likes, comments, follows) are personal and
+        // time-sensitive, so they get first pick of the hourly allowance;
+        // then any leftover one-per-post emails, then the digest.
+        const activity = await app.get(ActivityEmailsService).processBatch();
+        const legacy = await postEmails.processBatch();
+        await digests.buildDueDigest();
+        const digest = await digests.processBatch();
         const batches = [
-          ['New-post', await postEmails.processBatch()],
-          ['Activity', await app.get(ActivityEmailsService).processBatch()],
+          ['Activity', activity],
+          ['Post', legacy],
+          ['Digest', digest],
         ] as const;
         for (const [label, result] of batches) {
-          if (!result) continue;
+          if (!result || result.sent + result.failed + result.retrying + result.skipped === 0) {
+            continue;
+          }
           logger.log(
             `${label} batch done — sent ${result.sent}, retrying ${result.retrying}, ` +
               `failed ${result.failed}, skipped ${result.skipped}`,
@@ -65,27 +81,39 @@ async function main(): Promise<number> {
         return 0;
       }
 
+      case 'digest': {
+        await digests.buildDueDigest(true);
+        return 0;
+      }
+
       case 'test': {
-        const postId = Number(args[0]);
-        const to = args[1] ?? app.get(ConfigService).get<string>('postEmails.testRecipient');
-        if (!postId || !to) {
-          logger.error('Usage: test <postId> [email]  (or set POST_EMAIL_TEST_RECIPIENT)');
+        const to = args[0] ?? app.get(ConfigService).get<string>('postEmails.testRecipient');
+        if (!to) {
+          logger.error('Usage: test [email]  (or set POST_EMAIL_TEST_RECIPIENT)');
           return 1;
         }
-        const post = await app
-          .get<Repository<Post>>(getRepositoryToken(Post))
-          .findOne({ where: { id: postId }, relations: { author: true, media: true } });
-        if (!post) {
-          logger.error(`Post ${postId} not found`);
+        let posts = await digests.pendingPosts();
+        if (posts.length === 0) {
+          posts = (
+            await app.get<Repository<Post>>(getRepositoryToken(Post)).find({
+              where: { status: PostStatus.APPROVED },
+              relations: { author: true, media: true },
+              order: { reviewedAt: 'DESC', id: 'DESC' },
+              take: 3,
+            })
+          ).reverse();
+        }
+        if (posts.length === 0) {
+          logger.error('No approved posts to preview.');
           return 1;
         }
-        await postEmails.sendForPost(post, to, 'Test recipient');
-        logger.log(`Sent post ${postId}'s notification to ${to}`);
+        await postEmails.sendDigest(posts, to, 'Test recipient', new Date());
+        logger.log(`Sent a preview digest of ${posts.length} post(s) to ${to}`);
         return 0;
       }
 
       default:
-        logger.error(`Unknown command "${command}" — use worker, recipients or test`);
+        logger.error(`Unknown command "${command}" — use worker, recipients, digest or test`);
         return 1;
     }
   } finally {

@@ -14,6 +14,7 @@ export declare class Post {
     status: PostStatus;
     reviewedBy: number | null;
     reviewedAt: Date | null;
+    notifyByEmail: boolean;
     notifiedAt: Date | null;
     media: Relation<PostMedia>[];
     createdAt: Date;
