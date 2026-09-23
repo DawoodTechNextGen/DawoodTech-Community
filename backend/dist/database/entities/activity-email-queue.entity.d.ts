@@ -5,7 +5,8 @@ export declare enum ActivityEmailType {
     LIKE = "like",
     COMMENT = "comment",
     REPLY = "reply",
-    THREAD_COMMENT = "thread_comment"
+    THREAD_COMMENT = "thread_comment",
+    FOLLOW = "follow"
 }
 export declare class ActivityEmailQueue {
     id: number;
@@ -13,8 +14,8 @@ export declare class ActivityEmailQueue {
     recipientUserId: number;
     email: string;
     type: ActivityEmailType;
-    postId: number;
-    post: Relation<Post>;
+    postId: number | null;
+    post: Relation<Post> | null;
     actorId: number;
     commentId: number | null;
     status: PostEmailStatus;

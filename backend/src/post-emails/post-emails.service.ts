@@ -8,11 +8,16 @@ import {
   PostEmailQueue,
   PostEmailStatus,
 } from '../database/entities/post-email-queue.entity.js';
+import { User, UserStatus } from '../database/entities/user.entity.js';
 import { newPostTemplate } from '../mail/community-templates.js';
 import { MailService } from '../mail/mail.service.js';
 import { PostEmailEvents, type PostPublishedEvent } from './post-email.events.js';
 import { postExcerpt, postTitle } from './post-summary.js';
-import { TaskdeskRecipientsService, type Recipient } from './taskdesk-recipients.service.js';
+import {
+  dedupeRecipients,
+  TaskdeskRecipientsService,
+  type Recipient,
+} from './taskdesk-recipients.service.js';
 import {
   errorMessage,
   normalizeEmail,
@@ -51,6 +56,7 @@ export class PostEmailsService {
     @InjectRepository(Post) private readonly posts: Repository<Post>,
     @InjectRepository(PostEmailQueue)
     private readonly queue: Repository<PostEmailQueue>,
+    @InjectRepository(User) private readonly users: Repository<User>,
     @InjectDataSource() private readonly dataSource: DataSource,
     private readonly recipients: TaskdeskRecipientsService,
     private readonly mail: MailService,
@@ -90,7 +96,7 @@ export class PostEmailsService {
     }
 
     if (mode === 'dry_run') {
-      const recipients = await this.eligibleRecipients();
+      const recipients = await this.eligibleRecipients(postId);
       this.logger.log(
         `[dry_run] Post ${postId} would be emailed to ${recipients.length} recipients:\n` +
           recipients.map((r) => `  ${r.email}${r.name ? ` (${r.name})` : ''}`).join('\n'),
@@ -107,7 +113,7 @@ export class PostEmailsService {
     if (!claim.affected) return;
 
     try {
-      const recipients = await this.eligibleRecipients();
+      const recipients = await this.eligibleRecipients(postId);
       const added = await this.insertQueueRows(postId, recipients);
       this.logger.log(`Post ${postId}: queued ${added} emails`);
     } catch (err) {
@@ -118,8 +124,22 @@ export class PostEmailsService {
     }
   }
 
-  eligibleRecipients(): Promise<Recipient[]> {
-    return this.recipients.fetchRecipients();
+  /** TaskDesk interns plus active, verified community members — one entry per
+   *  address. The post's own author (when given) is left out. */
+  async eligibleRecipients(postId?: number): Promise<Recipient[]> {
+    const [interns, members, post] = await Promise.all([
+      this.recipients.fetchRecipients(),
+      this.users.find({
+        select: { email: true, fullName: true },
+        where: { status: UserStatus.ACTIVE, isEmailVerified: true },
+      }),
+      postId ? this.posts.findOne({ where: { id: postId }, relations: { author: true } }) : null,
+    ]);
+    const authorEmail = post?.author ? normalizeEmail(post.author.email) : null;
+    return dedupeRecipients([
+      ...interns,
+      ...members.map((u) => ({ email: u.email, name: u.fullName })),
+    ]).filter((r) => r.email !== authorEmail);
   }
 
   private async insertQueueRows(postId: number, recipients: Recipient[]): Promise<number> {

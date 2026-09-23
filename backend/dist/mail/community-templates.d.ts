@@ -19,17 +19,21 @@ export interface NewPostEmailInput extends CommonEmailInput {
     postUrl: string;
 }
 export declare function newPostTemplate(input: NewPostEmailInput): RenderedEmail;
+export interface ActivityPostPreview {
+    title: string;
+    label: string;
+    imageUrl: string | null;
+    url: string;
+}
 export interface ActivityEmailInput extends CommonEmailInput {
     heading: string;
     actorName: string;
     actorAvatarUrl: string | null;
     action: string;
     commentText: string | null;
-    postTitle: string;
-    postLabel: string;
-    postImageUrl: string | null;
-    postUrl: string;
+    post: ActivityPostPreview | null;
     buttonLabel: string;
+    buttonUrl: string;
 }
 export declare function activityTemplate(input: ActivityEmailInput): RenderedEmail;
 export {};

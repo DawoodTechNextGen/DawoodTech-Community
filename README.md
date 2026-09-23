@@ -107,11 +107,11 @@ Open `http://localhost:3001`.
 |---|---|
 | `NEXT_PUBLIC_API_URL` | Base URL of the backend API |
 
-## New-post emails to TaskDesk interns
+## New-post emails to interns and community members
 
-When an admin approves a post with **"Notify all interns by email"** checked (the default), every registered TaskDesk intern gets one email linking to it.
+When an admin approves a post with **"Email all interns and members about this post"** checked (the default), every registered TaskDesk intern and every community member gets one email linking to it.
 
-- **Recipients:** read-only query against TaskDesk's database (`TASKDESK_DB_*`). This covers every row in `registrations` (any status) plus `users` with `user_role` 2 (intern) or 6 (candidate). Emails are trimmed and lowercased, then de-duplicated. Invalid addresses are skipped.
+- **Recipients:** read-only query against TaskDesk's database (`TASKDESK_DB_*`). This covers every row in `registrations` (any status) plus `users` with `user_role` 2 (intern) or 6 (candidate). Active, email-verified community members are added on top. Emails are trimmed and lowercased, then de-duplicated, so someone in both gets one email. Invalid addresses and the post's own author are skipped.
 - **Once per post:** `posts.notified_at` is claimed atomically on first approval, so re-approving after an edit, a double-click or a retry never re-sends. Queue rows are also unique per `(post_id, email)`.
 - **Queue + worker:** approval only fills `post_email_queue`. A cron job sends `POST_EMAIL_BATCH_SIZE` emails per run (default 50) with `POST_EMAIL_DELAY_MS` between them, one email per recipient. A failed send is retried on later runs and marked `failed` after 3 attempts. A MySQL advisory lock stops overlapping runs from double-sending.
 - **Admin:** queued / sent / failed counts per post are shown under the review queue.
@@ -138,9 +138,9 @@ When an admin approves a post with **"Notify all interns by email"** checked (th
 | Full pipeline to only you | `POST_EMAIL_MODE=test` + `POST_EMAIL_TEST_RECIPIENT=you@example.com`: approving queues just your address and the cron worker sends it |
 | Go live | `POST_EMAIL_MODE=live`, then restart the app |
 
-## Like / comment emails to community members
+## Like / comment / follow emails to community members
 
-Community members also get an email when someone interacts with their content:
+Community members also get an email when someone interacts with their content or follows them:
 
 | Who | When | Email says |
 |---|---|---|
@@ -148,10 +148,11 @@ Community members also get an email when someone interacts with their content:
 | Post owner | Someone comments on their post | "Sara commented on your post" + the comment text |
 | Comment author | Someone replies to their comment | "Sara replied to your comment" |
 | Everyone who commented earlier | Someone else comments on the same post | "Sara also commented on a post you commented on" |
+| Followed member | Someone follows them | "Sara started following you" (merged like likes: "Sara and 2 others started following you") |
 
 - Each person gets **one** email per comment, picked in that priority order, and nobody is emailed about their own action.
 - Only active, email-verified members are emailed.
-- Unliking and re-liking never sends twice (queue rows are unique per like/comment + recipient). A like removed, or a comment deleted, before the worker runs is skipped.
+- Unliking and re-liking, or unfollowing and re-following, never sends twice (queue rows are unique per like/comment/follow + recipient). A like removed, a comment deleted or a follow undone before the worker runs is skipped.
 - Same queue + cron worker as new-post emails (`activity_email_queue`, created by migration on startup). The existing cron command sends both, nothing extra to set up.
 - `ACTIVITY_EMAIL_MODE` works like `POST_EMAIL_MODE` (`dry_run` / `test` / `live`) and defaults to it.
 

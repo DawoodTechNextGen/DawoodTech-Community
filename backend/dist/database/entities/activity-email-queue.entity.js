@@ -16,6 +16,7 @@ export var ActivityEmailType;
     ActivityEmailType["COMMENT"] = "comment";
     ActivityEmailType["REPLY"] = "reply";
     ActivityEmailType["THREAD_COMMENT"] = "thread_comment";
+    ActivityEmailType["FOLLOW"] = "follow";
 })(ActivityEmailType || (ActivityEmailType = {}));
 let ActivityEmailQueue = class ActivityEmailQueue {
     id;
@@ -57,11 +58,11 @@ __decorate([
     __metadata("design:type", String)
 ], ActivityEmailQueue.prototype, "type", void 0);
 __decorate([
-    Column({ name: 'post_id', type: 'bigint' }),
-    __metadata("design:type", Number)
+    Column({ name: 'post_id', type: 'bigint', nullable: true }),
+    __metadata("design:type", Object)
 ], ActivityEmailQueue.prototype, "postId", void 0);
 __decorate([
-    ManyToOne(() => Post, { onDelete: 'CASCADE' }),
+    ManyToOne(() => Post, { onDelete: 'CASCADE', nullable: true }),
     JoinColumn({ name: 'post_id' }),
     __metadata("design:type", Object)
 ], ActivityEmailQueue.prototype, "post", void 0);

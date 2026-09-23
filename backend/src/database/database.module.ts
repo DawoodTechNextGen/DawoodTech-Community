@@ -12,6 +12,7 @@ import { Notification } from './entities/notification.entity.js';
 import { PostEmailQueue } from './entities/post-email-queue.entity.js';
 import { PostEmailNotifications1790136000000 } from './migrations/1790136000000-PostEmailNotifications.js';
 import { ActivityEmails1790200000000 } from './migrations/1790200000000-ActivityEmails.js';
+import { FollowEmails1790300000000 } from './migrations/1790300000000-FollowEmails.js';
 import { ActivityEmailQueue } from './entities/activity-email-queue.entity.js';
 
 @Module({
@@ -42,7 +43,11 @@ import { ActivityEmailQueue } from './entities/activity-email-queue.entity.js';
         // Schema changes for production (where synchronize is off) ship as
         // migrations and apply themselves on startup; TypeORM records each
         // one in the `migrations` table so it only ever runs once.
-        migrations: [PostEmailNotifications1790136000000, ActivityEmails1790200000000],
+        migrations: [
+          PostEmailNotifications1790136000000,
+          ActivityEmails1790200000000,
+          FollowEmails1790300000000,
+        ],
         migrationsRun: true,
         charset: 'utf8mb4',
         extra: { connectionLimit: 10 },

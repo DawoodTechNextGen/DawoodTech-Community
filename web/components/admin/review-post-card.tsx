@@ -71,7 +71,7 @@ export function ReviewPostCard({
               onChange={(e) => setNotifyInterns(e.target.checked)}
               className="h-4 w-4 accent-brand"
             />
-            Notify all interns by email
+            Email all interns and members about this post
           </label>
 
           <div className="mt-3 flex items-center gap-2">

@@ -18,25 +18,28 @@ import { InjectDataSource, InjectRepository } from '@nestjs/typeorm';
 import { DataSource, IsNull, Repository } from 'typeorm';
 import { Post, PostStatus } from '../database/entities/post.entity.js';
 import { PostEmailQueue, PostEmailStatus, } from '../database/entities/post-email-queue.entity.js';
+import { User, UserStatus } from '../database/entities/user.entity.js';
 import { newPostTemplate } from '../mail/community-templates.js';
 import { MailService } from '../mail/mail.service.js';
 import { PostEmailEvents } from './post-email.events.js';
 import { postExcerpt, postTitle } from './post-summary.js';
-import { TaskdeskRecipientsService } from './taskdesk-recipients.service.js';
+import { dedupeRecipients, TaskdeskRecipientsService, } from './taskdesk-recipients.service.js';
 import { errorMessage, normalizeEmail, sleep, toAbsoluteUrl, withAdvisoryLock, } from './email-worker-utils.js';
 const INSERT_CHUNK = 500;
 const WORKER_LOCK = 'dawoodtech_community_post_email_worker';
 let PostEmailsService = PostEmailsService_1 = class PostEmailsService {
     posts;
     queue;
+    users;
     dataSource;
     recipients;
     mail;
     config;
     logger = new Logger(PostEmailsService_1.name);
-    constructor(posts, queue, dataSource, recipients, mail, config) {
+    constructor(posts, queue, users, dataSource, recipients, mail, config) {
         this.posts = posts;
         this.queue = queue;
+        this.users = users;
         this.dataSource = dataSource;
         this.recipients = recipients;
         this.mail = mail;
@@ -68,7 +71,7 @@ let PostEmailsService = PostEmailsService_1 = class PostEmailsService {
             return;
         }
         if (mode === 'dry_run') {
-            const recipients = await this.eligibleRecipients();
+            const recipients = await this.eligibleRecipients(postId);
             this.logger.log(`[dry_run] Post ${postId} would be emailed to ${recipients.length} recipients:\n` +
                 recipients.map((r) => `  ${r.email}${r.name ? ` (${r.name})` : ''}`).join('\n'));
             return;
@@ -77,7 +80,7 @@ let PostEmailsService = PostEmailsService_1 = class PostEmailsService {
         if (!claim.affected)
             return;
         try {
-            const recipients = await this.eligibleRecipients();
+            const recipients = await this.eligibleRecipients(postId);
             const added = await this.insertQueueRows(postId, recipients);
             this.logger.log(`Post ${postId}: queued ${added} emails`);
         }
@@ -86,8 +89,20 @@ let PostEmailsService = PostEmailsService_1 = class PostEmailsService {
             throw err;
         }
     }
-    eligibleRecipients() {
-        return this.recipients.fetchRecipients();
+    async eligibleRecipients(postId) {
+        const [interns, members, post] = await Promise.all([
+            this.recipients.fetchRecipients(),
+            this.users.find({
+                select: { email: true, fullName: true },
+                where: { status: UserStatus.ACTIVE, isEmailVerified: true },
+            }),
+            postId ? this.posts.findOne({ where: { id: postId }, relations: { author: true } }) : null,
+        ]);
+        const authorEmail = post?.author ? normalizeEmail(post.author.email) : null;
+        return dedupeRecipients([
+            ...interns,
+            ...members.map((u) => ({ email: u.email, name: u.fullName })),
+        ]).filter((r) => r.email !== authorEmail);
     }
     async insertQueueRows(postId, recipients) {
         let added = 0;
@@ -233,8 +248,10 @@ PostEmailsService = PostEmailsService_1 = __decorate([
     Injectable(),
     __param(0, InjectRepository(Post)),
     __param(1, InjectRepository(PostEmailQueue)),
-    __param(2, InjectDataSource()),
+    __param(2, InjectRepository(User)),
+    __param(3, InjectDataSource()),
     __metadata("design:paramtypes", [Repository,
+        Repository,
         Repository,
         DataSource,
         TaskdeskRecipientsService,

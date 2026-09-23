@@ -6,6 +6,8 @@ backend/coverage/
 backend/*.tsbuildinfo
 backend/.env*
 !backend/.env.example
+# cPanel app root is backend/dist — the cron CLI reads its .env from there
+backend/dist/.env
 backend/uploads/*
 !backend/uploads/.gitkeep
 

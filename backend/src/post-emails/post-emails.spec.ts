@@ -1,4 +1,4 @@
-import { newPostTemplate } from '../mail/community-templates.js';
+import { activityTemplate, newPostTemplate } from '../mail/community-templates.js';
 import { postExcerpt, postTitle } from './post-summary.js';
 import { dedupeRecipients } from './taskdesk-recipients.service.js';
 
@@ -62,5 +62,51 @@ describe('post summary + template', () => {
     expect(html).toContain('&quot;Mallory&quot;');
     expect(html).not.toContain('nsubscribe');
     expect(text).toContain('https://community.test/post/1');
+  });
+});
+
+describe('activity template', () => {
+  const common = {
+    recipientName: 'Ali',
+    recipientEmail: 'ali@example.com',
+    actorName: 'Sara',
+    actorAvatarUrl: null,
+    commentText: null,
+    communityUrl: 'https://community.test',
+    logoUrl: 'https://community.test/logo-full.png',
+    date: new Date('2026-09-23T10:00:00Z'),
+  };
+
+  it('renders a follow email with no post, linking to the profile', () => {
+    const { subject, html, text } = activityTemplate({
+      ...common,
+      heading: 'New follower',
+      action: 'started following you',
+      post: null,
+      buttonLabel: 'View profile',
+      buttonUrl: 'https://community.test/profile/7',
+    });
+    expect(subject).toBe('Sara started following you');
+    expect(html).toContain('href="https://community.test/profile/7"');
+    expect(html).not.toContain('reply in the community');
+    expect(text).toContain('View profile: https://community.test/profile/7');
+  });
+
+  it('renders the post preview for post activity', () => {
+    const { html } = activityTemplate({
+      ...common,
+      heading: 'New like',
+      action: 'liked your post',
+      post: {
+        title: 'Got hired!',
+        label: 'Your post',
+        imageUrl: null,
+        url: 'https://community.test/post/1',
+      },
+      buttonLabel: 'View post',
+      buttonUrl: 'https://community.test/post/1',
+    });
+    expect(html).toContain('Got hired!');
+    expect(html).toContain('Your post');
   });
 });

@@ -20,15 +20,17 @@ export enum ActivityEmailType {
   REPLY = 'reply',
   /** Someone commented on a post the recipient had commented on earlier. */
   THREAD_COMMENT = 'thread_comment',
+  /** Someone started following the recipient. */
+  FOLLOW = 'follow',
 }
 
-/** Emails to community members about activity on their posts/comments. */
+/** Emails to community members about activity on their posts/comments, and new followers. */
 @Entity('activity_email_queue')
 export class ActivityEmailQueue {
   @PrimaryGeneratedColumn({ type: 'bigint' })
   id!: number;
 
-  /** e.g. "like:<post>:<actor>:<recipient>" or "comment:<comment>:<recipient>" —
+  /** e.g. "like:<post>:<actor>:<recipient>" or "comment:<comment>:<recipient>" / "follow:<follower>:<recipient>" —
    *  makes enqueueing idempotent, so an unlike/re-like never emails twice. */
   @Index({ unique: true })
   @Column({ name: 'dedupe_key', length: 191 })
@@ -44,12 +46,13 @@ export class ActivityEmailQueue {
   @Column({ type: 'enum', enum: ActivityEmailType })
   type!: ActivityEmailType;
 
-  @Column({ name: 'post_id', type: 'bigint' })
-  postId!: number;
+  /** Null for follow emails. */
+  @Column({ name: 'post_id', type: 'bigint', nullable: true })
+  postId!: number | null;
 
-  @ManyToOne(() => Post, { onDelete: 'CASCADE' })
+  @ManyToOne(() => Post, { onDelete: 'CASCADE', nullable: true })
   @JoinColumn({ name: 'post_id' })
-  post!: Relation<Post>;
+  post!: Relation<Post> | null;
 
   @Column({ name: 'actor_id', type: 'bigint' })
   actorId!: number;

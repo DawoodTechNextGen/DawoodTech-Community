@@ -2,21 +2,23 @@ import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { OnEvent } from '@nestjs/event-emitter';
 import { InjectDataSource, InjectRepository } from '@nestjs/typeorm';
-import { DataSource, In, Repository } from 'typeorm';
+import { DataSource, In, IsNull, Repository } from 'typeorm';
 import {
   ActivityEmailQueue,
   ActivityEmailType,
 } from '../database/entities/activity-email-queue.entity.js';
 import { Comment } from '../database/entities/comment.entity.js';
+import { Follow } from '../database/entities/follow.entity.js';
 import { Like } from '../database/entities/like.entity.js';
 import { Post, PostStatus } from '../database/entities/post.entity.js';
 import { PostEmailStatus } from '../database/entities/post-email-queue.entity.js';
 import { User, UserStatus } from '../database/entities/user.entity.js';
-import { activityTemplate } from '../mail/community-templates.js';
+import { activityTemplate, type ActivityPostPreview } from '../mail/community-templates.js';
 import { MailService } from '../mail/mail.service.js';
 import {
   NotificationEvents,
   type CommentPostedEvent,
+  type FollowCreatedEvent,
   type LikeCreatedEvent,
 } from '../notifications/notification.events.js';
 import {
@@ -34,14 +36,14 @@ const WORKER_LOCK = 'dawoodtech_community_activity_email_worker';
 const COMMENT_EXCERPT_MAX = 300;
 
 interface EnqueueContext {
-  postId: number;
+  postId: number | null;
   actorId: number;
   commentId: number | null;
   dedupeKey: (recipientId: number) => string;
 }
 
 /** Emails community members when someone likes their post, comments on it,
- *  replies to their comment, or joins a thread they commented in. */
+ *  replies to their comment, joins a thread they commented in, or follows them. */
 @Injectable()
 export class ActivityEmailsService {
   private readonly logger = new Logger(ActivityEmailsService.name);
@@ -52,6 +54,7 @@ export class ActivityEmailsService {
     @InjectRepository(Post) private readonly posts: Repository<Post>,
     @InjectRepository(Comment) private readonly comments: Repository<Comment>,
     @InjectRepository(Like) private readonly likes: Repository<Like>,
+    @InjectRepository(Follow) private readonly follows: Repository<Follow>,
     @InjectRepository(User) private readonly users: Repository<User>,
     @InjectDataSource() private readonly dataSource: DataSource,
     private readonly mail: MailService,
@@ -102,6 +105,19 @@ export class ActivityEmailsService {
     });
   }
 
+  @OnEvent(NotificationEvents.FollowCreated)
+  async handleFollowCreated({ followingId, followerId }: FollowCreatedEvent): Promise<void> {
+    if (Number(followingId) === Number(followerId)) return;
+    await this.safely(`follow of user ${followingId}`, () =>
+      this.enqueue([{ userId: followingId, type: ActivityEmailType.FOLLOW }], {
+        postId: null,
+        actorId: followerId,
+        commentId: null,
+        dedupeKey: (recipientId) => `follow:${followerId}:${recipientId}`,
+      }),
+    );
+  }
+
   private async safely(what: string, fn: () => Promise<void>): Promise<void> {
     try {
       await fn();
@@ -133,7 +149,7 @@ export class ActivityEmailsService {
     const mode = this.mode;
     if (mode === 'dry_run') {
       this.logger.log(
-        `[dry_run] Activity emails for post ${ctx.postId}:\n` +
+        `[dry_run] Activity emails${ctx.postId ? ` for post ${ctx.postId}` : ''}:\n` +
           rows.map((r) => `  ${r.type} → ${r.email}`).join('\n'),
       );
       return;
@@ -202,15 +218,16 @@ export class ActivityEmailsService {
     for (const row of rows) {
       if (handled.has(Number(row.id))) continue;
 
-      // Likes for the same post+recipient that are still waiting go out as one
-      // email ("Ali and 3 others liked your post") instead of one per like.
+      // Likes for the same post+recipient (and follows of the same recipient)
+      // that are still waiting go out as one email — "Ali and 3 others liked
+      // your post" — instead of one per like/follow.
       const group =
-        row.type === ActivityEmailType.LIKE
+        row.type === ActivityEmailType.LIKE || row.type === ActivityEmailType.FOLLOW
           ? await this.queue.find({
               where: {
                 status: PostEmailStatus.QUEUED,
-                type: ActivityEmailType.LIKE,
-                postId: row.postId,
+                type: row.type,
+                postId: row.postId ?? IsNull(),
                 recipientUserId: row.recipientUserId,
               },
               order: { id: 'ASC' },
@@ -227,21 +244,40 @@ export class ActivityEmailsService {
         result.skipped += items.length;
       };
 
-      const post = await this.posts.findOne({
-        where: { id: row.postId },
-        relations: { author: true, media: true },
-      });
-      if (!post || post.status !== PostStatus.APPROVED) {
-        await skip(group, 'Post no longer published');
-        continue;
+      let post: Post | null = null;
+      if (row.postId) {
+        post = await this.posts.findOne({
+          where: { id: row.postId },
+          relations: { author: true, media: true },
+        });
+        if (!post || post.status !== PostStatus.APPROVED) {
+          await skip(group, 'Post no longer published');
+          continue;
+        }
       }
 
       let active = group;
       let comment: Comment | null = null;
-      if (row.type === ActivityEmailType.LIKE) {
+      if (row.type === ActivityEmailType.FOLLOW) {
+        // Drop follows that were undone before we got to them.
+        const stillFollowing = await this.follows.find({
+          where: {
+            followingId: row.recipientUserId,
+            followerId: In(group.map((r) => r.actorId)),
+          },
+        });
+        const followerIds = new Set(stillFollowing.map((f) => Number(f.followerId)));
+        const withdrawn = group.filter((r) => !followerIds.has(Number(r.actorId)));
+        if (withdrawn.length) await skip(withdrawn, 'Unfollowed');
+        active = group.filter((r) => followerIds.has(Number(r.actorId)));
+        if (active.length === 0) continue;
+      } else if (!post) {
+        await skip(group, 'Post no longer published');
+        continue;
+      } else if (row.type === ActivityEmailType.LIKE) {
         // Drop likes that were taken back before we got to them.
         const stillLiked = await this.likes.find({
-          where: { postId: row.postId, userId: In(group.map((r) => r.actorId)) },
+          where: { postId: post.id, userId: In(group.map((r) => r.actorId)) },
         });
         const likerIds = new Set(stillLiked.map((l) => Number(l.userId)));
         const withdrawn = group.filter((r) => !likerIds.has(Number(r.actorId)));
@@ -296,7 +332,7 @@ export class ActivityEmailsService {
 
   private async send(
     group: ActivityEmailQueue[],
-    post: Post,
+    post: Post | null,
     comment: Comment | null,
   ): Promise<void> {
     const communityUrl = this.config.get<string>('communityUrl')!;
@@ -310,7 +346,7 @@ export class ActivityEmailsService {
       this.users.findOneBy({ id: leadActorId }),
     ]);
     const actorName = actor?.fullName ?? 'Someone';
-    const ownerName = post.author?.fullName ?? 'a community member';
+    const ownerName = post?.author?.fullName ?? 'a community member';
     const others = group.length - 1;
 
     const copy: Record<
@@ -344,6 +380,15 @@ export class ActivityEmailsService {
         postLabel: `${ownerName}'s post`,
         button: 'View comment',
       },
+      [ActivityEmailType.FOLLOW]: {
+        heading: 'New follower',
+        action:
+          others > 0
+            ? `and ${others} other${others > 1 ? 's' : ''} started following you`
+            : 'started following you',
+        postLabel: '',
+        button: others > 0 ? 'See your followers' : 'View profile',
+      },
     };
     const { heading, action, postLabel, button } = copy[row.type];
 
@@ -352,7 +397,21 @@ export class ActivityEmailsService {
         ? `${comment.content.slice(0, COMMENT_EXCERPT_MAX - 1).trimEnd()}…`
         : comment.content
       : null;
-    const firstImage = [...(post.media ?? [])].sort((a, b) => a.sortOrder - b.sortOrder)[0];
+    let preview: ActivityPostPreview | null = null;
+    if (post) {
+      const firstImage = [...(post.media ?? [])].sort((a, b) => a.sortOrder - b.sortOrder)[0];
+      preview = {
+        title: postTitle(post.content),
+        label: postLabel,
+        imageUrl: toAbsoluteUrl(apiUrl, firstImage?.url),
+        url: `${communityUrl}/post/${post.id}`,
+      };
+    }
+    // Follow emails link to the follower's profile, or to the recipient's own
+    // profile (where the followers list lives) when several are merged.
+    const buttonUrl =
+      preview?.url ??
+      `${communityUrl}/profile/${others > 0 ? row.recipientUserId : leadActorId}`;
 
     const { subject, html, text } = activityTemplate({
       heading,
@@ -362,11 +421,9 @@ export class ActivityEmailsService {
       actorAvatarUrl: toAbsoluteUrl(apiUrl, actor?.avatarUrl),
       action,
       commentText,
-      postTitle: postTitle(post.content),
-      postLabel,
-      postImageUrl: toAbsoluteUrl(apiUrl, firstImage?.url),
-      postUrl: `${communityUrl}/post/${post.id}`,
+      post: preview,
       buttonLabel: button,
+      buttonUrl,
       communityUrl,
       logoUrl: `${communityUrl}/logo-full.png`,
       date: new Date(),

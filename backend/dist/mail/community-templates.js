@@ -100,7 +100,7 @@ function textFooter(input, reason) {
     ];
 }
 export function newPostTemplate(input) {
-    const reason = 'because you registered for a DawoodTech internship.';
+    const reason = "because you're part of DawoodTech Community or registered for a DawoodTech internship.";
     const communityUrl = e(input.communityUrl);
     const postUrl = e(input.postUrl);
     const bodyRows = `
@@ -156,10 +156,38 @@ export function newPostTemplate(input) {
 }
 export function activityTemplate(input) {
     const reason = "because you're a member of DawoodTech Community.";
-    const postUrl = e(input.postUrl);
+    const { post } = input;
     const comment = input.commentText
         ? `<div style="margin: 14px 0 0; padding: 12px 14px; background: #f9fafb; border-left: 3px solid ${BRAND}; border-radius: 8px; font-size: 14px; line-height: 1.6; color: #1f2937; white-space: pre-line;">${e(input.commentText)}</div>`
         : '';
+    const postRows = post
+        ? `
+        <tr><td style="padding: 0 0 22px; border-bottom: 1px solid ${BORDER};">
+          <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="border: 1px solid ${BORDER}; border-radius: 12px;"><tr>
+            <td valign="middle" style="padding: 14px 16px;">
+              <div style="font-size: 12px; font-weight: 600; letter-spacing: 0.03em; text-transform: uppercase; color: ${MUTED};">${e(post.label)}</div>
+              <div class="post-title" style="font-size: 16px; font-weight: 700; line-height: 1.45; margin: 6px 0 12px;">
+                <a href="${e(post.url)}" style="color: #111827; text-decoration: none;">${e(post.title)}</a>
+              </div>
+              ${pillButton(input.buttonUrl, input.buttonLabel)}
+            </td>
+            ${thumbnailCell(post.imageUrl, post.url).replace('padding-left: 14px;', 'padding: 12px 12px 12px 0;')}
+          </tr></table>
+        </td></tr>
+
+        <tr><td style="padding: 18px 0 22px; font-size: 13px; line-height: 1.6; color: ${MUTED};">
+          Keep the conversation going —
+          <a href="${e(post.url)}" style="color: ${MUTED}; text-decoration: underline;">reply in the community &rarr;</a>
+        </td></tr>`
+        : `
+        <tr><td style="padding: 0 0 22px; border-bottom: 1px solid ${BORDER};">
+          ${pillButton(input.buttonUrl, input.buttonLabel)}
+        </td></tr>
+
+        <tr><td style="padding: 18px 0 22px; font-size: 13px; line-height: 1.6; color: ${MUTED};">
+          Follow them back to see their wins in your feed —
+          <a href="${e(input.communityUrl)}/feed" style="color: ${MUTED}; text-decoration: underline;">open the community &rarr;</a>
+        </td></tr>`;
     const bodyRows = `
         <tr><td style="padding: 18px 0 0; font-size: 14px; line-height: 1.6; color: #4b5563;">
           ${e(greeting(input.recipientName))}
@@ -174,24 +202,7 @@ export function activityTemplate(input) {
           </tr></table>
           ${comment}
         </td></tr>
-
-        <tr><td style="padding: 0 0 22px; border-bottom: 1px solid ${BORDER};">
-          <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="border: 1px solid ${BORDER}; border-radius: 12px;"><tr>
-            <td valign="middle" style="padding: 14px 16px;">
-              <div style="font-size: 12px; font-weight: 600; letter-spacing: 0.03em; text-transform: uppercase; color: ${MUTED};">${e(input.postLabel)}</div>
-              <div class="post-title" style="font-size: 16px; font-weight: 700; line-height: 1.45; margin: 6px 0 12px;">
-                <a href="${postUrl}" style="color: #111827; text-decoration: none;">${e(input.postTitle)}</a>
-              </div>
-              ${pillButton(input.postUrl, input.buttonLabel)}
-            </td>
-            ${thumbnailCell(input.postImageUrl, input.postUrl).replace('padding-left: 14px;', 'padding: 12px 12px 12px 0;')}
-          </tr></table>
-        </td></tr>
-
-        <tr><td style="padding: 18px 0 22px; font-size: 13px; line-height: 1.6; color: ${MUTED};">
-          Keep the conversation going —
-          <a href="${postUrl}" style="color: ${MUTED}; text-decoration: underline;">reply in the community &rarr;</a>
-        </td></tr>`;
+${postRows}`;
     const text = [
         `${input.heading} · ${formatDate(input.date)}`,
         '',
@@ -200,8 +211,8 @@ export function activityTemplate(input) {
         `${input.actorName} ${input.action}`,
         ...(input.commentText ? ['', `"${input.commentText}"`] : []),
         '',
-        `${input.postLabel}: ${input.postTitle}`,
-        `${input.buttonLabel}: ${input.postUrl}`,
+        ...(post ? [`${post.label}: ${post.title}`] : []),
+        `${input.buttonLabel}: ${input.buttonUrl}`,
         ...textFooter(input, reason),
     ].join('\n');
     return {

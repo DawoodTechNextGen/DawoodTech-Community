@@ -13,7 +13,7 @@ const MODE_LABELS: Record<PostEmailStatsResponse["mode"], string | null> = {
   dry_run: "Dry run: recipients are logged, nothing is sent",
 };
 
-/** Per-post counts from the intern email queue (queued / sent / failed). */
+/** Per-post counts from the new-post email queue (queued / sent / failed). */
 export function PostEmailStatsPanel() {
   const [data, setData] = useState<PostEmailStatsResponse | null>(null);
   const [error, setError] = useState(false);
@@ -47,7 +47,7 @@ export function PostEmailStatsPanel() {
     <section className="mt-8">
       <div className="mb-3 flex items-center gap-2">
         <Mail className="h-4 w-4 text-brand" />
-        <h2 className="text-sm font-semibold">Intern email notifications</h2>
+        <h2 className="text-sm font-semibold">New-post email notifications</h2>
         <button
           type="button"
           onClick={load}

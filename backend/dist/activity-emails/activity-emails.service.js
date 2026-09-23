@@ -15,9 +15,10 @@ import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { OnEvent } from '@nestjs/event-emitter';
 import { InjectDataSource, InjectRepository } from '@nestjs/typeorm';
-import { DataSource, In, Repository } from 'typeorm';
+import { DataSource, In, IsNull, Repository } from 'typeorm';
 import { ActivityEmailQueue, ActivityEmailType, } from '../database/entities/activity-email-queue.entity.js';
 import { Comment } from '../database/entities/comment.entity.js';
+import { Follow } from '../database/entities/follow.entity.js';
 import { Like } from '../database/entities/like.entity.js';
 import { Post, PostStatus } from '../database/entities/post.entity.js';
 import { PostEmailStatus } from '../database/entities/post-email-queue.entity.js';
@@ -35,16 +36,18 @@ let ActivityEmailsService = ActivityEmailsService_1 = class ActivityEmailsServic
     posts;
     comments;
     likes;
+    follows;
     users;
     dataSource;
     mail;
     config;
     logger = new Logger(ActivityEmailsService_1.name);
-    constructor(queue, posts, comments, likes, users, dataSource, mail, config) {
+    constructor(queue, posts, comments, likes, follows, users, dataSource, mail, config) {
         this.queue = queue;
         this.posts = posts;
         this.comments = comments;
         this.likes = likes;
+        this.follows = follows;
         this.users = users;
         this.dataSource = dataSource;
         this.mail = mail;
@@ -79,6 +82,16 @@ let ActivityEmailsService = ActivityEmailsService_1 = class ActivityEmailsServic
             });
         });
     }
+    async handleFollowCreated({ followingId, followerId }) {
+        if (Number(followingId) === Number(followerId))
+            return;
+        await this.safely(`follow of user ${followingId}`, () => this.enqueue([{ userId: followingId, type: ActivityEmailType.FOLLOW }], {
+            postId: null,
+            actorId: followerId,
+            commentId: null,
+            dedupeKey: (recipientId) => `follow:${followerId}:${recipientId}`,
+        }));
+    }
     async safely(what, fn) {
         try {
             await fn();
@@ -108,7 +121,7 @@ let ActivityEmailsService = ActivityEmailsService_1 = class ActivityEmailsServic
             return;
         const mode = this.mode;
         if (mode === 'dry_run') {
-            this.logger.log(`[dry_run] Activity emails for post ${ctx.postId}:\n` +
+            this.logger.log(`[dry_run] Activity emails${ctx.postId ? ` for post ${ctx.postId}` : ''}:\n` +
                 rows.map((r) => `  ${r.type} → ${r.email}`).join('\n'));
             return;
         }
@@ -165,12 +178,12 @@ let ActivityEmailsService = ActivityEmailsService_1 = class ActivityEmailsServic
         for (const row of rows) {
             if (handled.has(Number(row.id)))
                 continue;
-            const group = row.type === ActivityEmailType.LIKE
+            const group = row.type === ActivityEmailType.LIKE || row.type === ActivityEmailType.FOLLOW
                 ? await this.queue.find({
                     where: {
                         status: PostEmailStatus.QUEUED,
-                        type: ActivityEmailType.LIKE,
-                        postId: row.postId,
+                        type: row.type,
+                        postId: row.postId ?? IsNull(),
                         recipientUserId: row.recipientUserId,
                     },
                     order: { id: 'ASC' },
@@ -185,19 +198,41 @@ let ActivityEmailsService = ActivityEmailsService_1 = class ActivityEmailsServic
                 await this.queue.save(items);
                 result.skipped += items.length;
             };
-            const post = await this.posts.findOne({
-                where: { id: row.postId },
-                relations: { author: true, media: true },
-            });
-            if (!post || post.status !== PostStatus.APPROVED) {
-                await skip(group, 'Post no longer published');
-                continue;
+            let post = null;
+            if (row.postId) {
+                post = await this.posts.findOne({
+                    where: { id: row.postId },
+                    relations: { author: true, media: true },
+                });
+                if (!post || post.status !== PostStatus.APPROVED) {
+                    await skip(group, 'Post no longer published');
+                    continue;
+                }
             }
             let active = group;
             let comment = null;
-            if (row.type === ActivityEmailType.LIKE) {
+            if (row.type === ActivityEmailType.FOLLOW) {
+                const stillFollowing = await this.follows.find({
+                    where: {
+                        followingId: row.recipientUserId,
+                        followerId: In(group.map((r) => r.actorId)),
+                    },
+                });
+                const followerIds = new Set(stillFollowing.map((f) => Number(f.followerId)));
+                const withdrawn = group.filter((r) => !followerIds.has(Number(r.actorId)));
+                if (withdrawn.length)
+                    await skip(withdrawn, 'Unfollowed');
+                active = group.filter((r) => followerIds.has(Number(r.actorId)));
+                if (active.length === 0)
+                    continue;
+            }
+            else if (!post) {
+                await skip(group, 'Post no longer published');
+                continue;
+            }
+            else if (row.type === ActivityEmailType.LIKE) {
                 const stillLiked = await this.likes.find({
-                    where: { postId: row.postId, userId: In(group.map((r) => r.actorId)) },
+                    where: { postId: post.id, userId: In(group.map((r) => r.actorId)) },
                 });
                 const likerIds = new Set(stillLiked.map((l) => Number(l.userId)));
                 const withdrawn = group.filter((r) => !likerIds.has(Number(r.actorId)));
@@ -261,7 +296,7 @@ let ActivityEmailsService = ActivityEmailsService_1 = class ActivityEmailsServic
             this.users.findOneBy({ id: leadActorId }),
         ]);
         const actorName = actor?.fullName ?? 'Someone';
-        const ownerName = post.author?.fullName ?? 'a community member';
+        const ownerName = post?.author?.fullName ?? 'a community member';
         const others = group.length - 1;
         const copy = {
             [ActivityEmailType.LIKE]: {
@@ -290,6 +325,14 @@ let ActivityEmailsService = ActivityEmailsService_1 = class ActivityEmailsServic
                 postLabel: `${ownerName}'s post`,
                 button: 'View comment',
             },
+            [ActivityEmailType.FOLLOW]: {
+                heading: 'New follower',
+                action: others > 0
+                    ? `and ${others} other${others > 1 ? 's' : ''} started following you`
+                    : 'started following you',
+                postLabel: '',
+                button: others > 0 ? 'See your followers' : 'View profile',
+            },
         };
         const { heading, action, postLabel, button } = copy[row.type];
         const commentText = comment
@@ -297,7 +340,18 @@ let ActivityEmailsService = ActivityEmailsService_1 = class ActivityEmailsServic
                 ? `${comment.content.slice(0, COMMENT_EXCERPT_MAX - 1).trimEnd()}…`
                 : comment.content
             : null;
-        const firstImage = [...(post.media ?? [])].sort((a, b) => a.sortOrder - b.sortOrder)[0];
+        let preview = null;
+        if (post) {
+            const firstImage = [...(post.media ?? [])].sort((a, b) => a.sortOrder - b.sortOrder)[0];
+            preview = {
+                title: postTitle(post.content),
+                label: postLabel,
+                imageUrl: toAbsoluteUrl(apiUrl, firstImage?.url),
+                url: `${communityUrl}/post/${post.id}`,
+            };
+        }
+        const buttonUrl = preview?.url ??
+            `${communityUrl}/profile/${others > 0 ? row.recipientUserId : leadActorId}`;
         const { subject, html, text } = activityTemplate({
             heading,
             recipientName: recipient?.fullName ?? null,
@@ -306,11 +360,9 @@ let ActivityEmailsService = ActivityEmailsService_1 = class ActivityEmailsServic
             actorAvatarUrl: toAbsoluteUrl(apiUrl, actor?.avatarUrl),
             action,
             commentText,
-            postTitle: postTitle(post.content),
-            postLabel,
-            postImageUrl: toAbsoluteUrl(apiUrl, firstImage?.url),
-            postUrl: `${communityUrl}/post/${post.id}`,
+            post: preview,
             buttonLabel: button,
+            buttonUrl,
             communityUrl,
             logoUrl: `${communityUrl}/logo-full.png`,
             date: new Date(),
@@ -330,15 +382,23 @@ __decorate([
     __metadata("design:paramtypes", [Object]),
     __metadata("design:returntype", Promise)
 ], ActivityEmailsService.prototype, "handleCommentPosted", null);
+__decorate([
+    OnEvent(NotificationEvents.FollowCreated),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", [Object]),
+    __metadata("design:returntype", Promise)
+], ActivityEmailsService.prototype, "handleFollowCreated", null);
 ActivityEmailsService = ActivityEmailsService_1 = __decorate([
     Injectable(),
     __param(0, InjectRepository(ActivityEmailQueue)),
     __param(1, InjectRepository(Post)),
     __param(2, InjectRepository(Comment)),
     __param(3, InjectRepository(Like)),
-    __param(4, InjectRepository(User)),
-    __param(5, InjectDataSource()),
+    __param(4, InjectRepository(Follow)),
+    __param(5, InjectRepository(User)),
+    __param(6, InjectDataSource()),
     __metadata("design:paramtypes", [Repository,
+        Repository,
         Repository,
         Repository,
         Repository,
