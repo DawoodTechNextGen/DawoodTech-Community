@@ -10,10 +10,11 @@ var __metadata = (this && this.__metadata) || function (k, v) {
 var __param = (this && this.__param) || function (paramIndex, decorator) {
     return function (target, key) { decorator(target, key, paramIndex); }
 };
-import { Body, Controller, Get, HttpCode, HttpStatus, Post } from '@nestjs/common';
+import { Body, Controller, Get, HttpCode, HttpStatus, Post, UseGuards } from '@nestjs/common';
+import { RateLimit, RateLimitGuard } from '../common/guards/rate-limit.guard.js';
 import { Public } from '../common/decorators/public.decorator.js';
 import { CurrentUser } from '../common/decorators/current-user.decorator.js';
-import { toPublicUser } from '../users/user.mapper.js';
+import { toSelfUser } from '../users/user.mapper.js';
 import { AuthService } from './auth.service.js';
 import { ForgotPasswordDto } from './dto/forgot-password.dto.js';
 import { LoginDto } from './dto/login.dto.js';
@@ -23,6 +24,8 @@ import { ResetPasswordDto } from './dto/reset-password.dto.js';
 import { SignupDto } from './dto/signup.dto.js';
 import { VerifyEmailDto } from './dto/verify-email.dto.js';
 import { UsersService } from '../users/users.service.js';
+const MINUTE = 60_000;
+const HOUR = 60 * MINUTE;
 let AuthController = class AuthController {
     auth;
     users;
@@ -32,11 +35,11 @@ let AuthController = class AuthController {
     }
     async signup(dto) {
         const user = await this.auth.signup(dto);
-        return { user: toPublicUser(user) };
+        return { user: toSelfUser(user) };
     }
     async login(dto) {
         const { user, tokens } = await this.auth.login(dto);
-        return { user: toPublicUser(user), ...tokens };
+        return { user: toSelfUser(user), ...tokens };
     }
     async refresh(dto) {
         return this.auth.refresh(dto.refreshToken);
@@ -63,12 +66,13 @@ let AuthController = class AuthController {
     }
     async me(authUser) {
         const user = await this.users.findByIdOrFail(authUser.id);
-        return toPublicUser(user);
+        return toSelfUser(user);
     }
 };
 __decorate([
     Public(),
     Post('signup'),
+    RateLimit({ windowMs: HOUR, perIp: 10, perEmail: 3 }),
     __param(0, Body()),
     __metadata("design:type", Function),
     __metadata("design:paramtypes", [SignupDto]),
@@ -77,6 +81,7 @@ __decorate([
 __decorate([
     Public(),
     Post('login'),
+    RateLimit({ windowMs: 15 * MINUTE, perIp: 30, perEmail: 10 }),
     HttpCode(HttpStatus.OK),
     __param(0, Body()),
     __metadata("design:type", Function),
@@ -86,6 +91,7 @@ __decorate([
 __decorate([
     Public(),
     Post('refresh'),
+    RateLimit({ windowMs: 15 * MINUTE, perIp: 120 }),
     HttpCode(HttpStatus.OK),
     __param(0, Body()),
     __metadata("design:type", Function),
@@ -104,6 +110,7 @@ __decorate([
 __decorate([
     Public(),
     Post('verify-email'),
+    RateLimit({ windowMs: 15 * MINUTE, perIp: 30 }),
     HttpCode(HttpStatus.OK),
     __param(0, Body()),
     __metadata("design:type", Function),
@@ -113,6 +120,7 @@ __decorate([
 __decorate([
     Public(),
     Post('resend-verification'),
+    RateLimit({ windowMs: HOUR, perIp: 10, perEmail: 3 }),
     HttpCode(HttpStatus.OK),
     __param(0, Body()),
     __metadata("design:type", Function),
@@ -122,6 +130,7 @@ __decorate([
 __decorate([
     Public(),
     Post('forgot-password'),
+    RateLimit({ windowMs: HOUR, perIp: 10, perEmail: 3 }),
     HttpCode(HttpStatus.OK),
     __param(0, Body()),
     __metadata("design:type", Function),
@@ -131,6 +140,7 @@ __decorate([
 __decorate([
     Public(),
     Post('reset-password'),
+    RateLimit({ windowMs: 15 * MINUTE, perIp: 20 }),
     HttpCode(HttpStatus.OK),
     __param(0, Body()),
     __metadata("design:type", Function),
@@ -146,6 +156,7 @@ __decorate([
 ], AuthController.prototype, "me", null);
 AuthController = __decorate([
     Controller('auth'),
+    UseGuards(RateLimitGuard),
     __metadata("design:paramtypes", [AuthService,
         UsersService])
 ], AuthController);

@@ -17,3 +17,13 @@ export function syncAppBadge(count: number): void {
     // Badging API not supported on this platform — no-op.
   }
 }
+
+/** Once everything is read, clear the device's notification tray too —
+ *  Android launchers base their icon dot/count on what's still in it. */
+export function clearDeliveredNotifications(): void {
+  if (typeof navigator === "undefined" || !("serviceWorker" in navigator)) return;
+  navigator.serviceWorker.ready
+    .then((registration) => registration.getNotifications())
+    .then((shown) => shown.forEach((n) => n.close()))
+    .catch(() => {});
+}

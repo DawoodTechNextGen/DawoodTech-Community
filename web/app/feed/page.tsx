@@ -2,20 +2,39 @@
 
 import { Compass, Users2 } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
+import { LeaderboardCard } from "@/components/community/leaderboard-card";
+import { TrendingTags } from "@/components/community/trending-tags";
 import { AboutCard } from "@/components/layout/about-card";
 import { AppShell } from "@/components/layout/app-shell";
 import { SuggestedMembers } from "@/components/layout/suggested-members";
 import { SuggestedMembersCarousel } from "@/components/layout/suggested-members-carousel";
+import { PushBanner } from "@/components/notifications/push-prompt";
+import { WelcomeChecklist } from "@/components/onboarding/welcome-checklist";
+import { DailyPromptCard } from "@/components/prompts/daily-prompt-card";
 import { CreatePostComposer } from "@/components/posts/create-post-composer";
 import { PostCard } from "@/components/posts/post-card";
 import { PostCardSkeleton } from "@/components/posts/post-card-skeleton";
 import { Button } from "@/components/ui/button";
 import { ErrorBanner } from "@/components/ui/error-banner";
 import { api } from "@/lib/api-client";
-import type { Post } from "@/lib/types";
+import { applyReaction, saveReaction } from "@/lib/reactions";
+import type { Post, Reaction } from "@/lib/types";
 import { useRequireAuth } from "@/lib/use-require-auth";
 
-type Tab = "feed" | "explore";
+type Tab = "feed" | "explore" | "questions";
+
+const TAB_LABELS: Record<Tab, string> = {
+  feed: "For You",
+  explore: "Explore",
+  questions: "Questions",
+};
+
+const fetchTab = (tab: Tab, cursor?: string) =>
+  tab === "feed"
+    ? api.getFeed(cursor)
+    : tab === "explore"
+      ? api.getExplore(cursor)
+      : api.getQuestions(cursor);
 
 export default function FeedPage() {
   const { user, isLoading: authLoading } = useRequireAuth();
@@ -25,12 +44,15 @@ export default function FeedPage() {
   const [loading, setLoading] = useState(true);
   const [loadingMore, setLoadingMore] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [progressKey, setProgressKey] = useState(0);
+  const [pinned, setPinned] = useState<Post[]>([]);
+  const isAdmin = user?.role === "admin";
 
   const load = useCallback(async (activeTab: Tab) => {
     setLoading(true);
     setError(null);
     try {
-      const res = activeTab === "feed" ? await api.getFeed() : await api.getExplore();
+      const res = await fetchTab(activeTab);
       setPosts(res.items);
       setCursor(res.nextCursor);
     } catch {
@@ -48,8 +70,7 @@ export default function FeedPage() {
     if (!cursor) return;
     setLoadingMore(true);
     try {
-      const res =
-        tab === "feed" ? await api.getFeed(cursor) : await api.getExplore(cursor);
+      const res = await fetchTab(tab, cursor);
       setPosts((prev) => [...prev, ...res.items]);
       setCursor(res.nextCursor);
     } catch {
@@ -59,27 +80,45 @@ export default function FeedPage() {
     }
   }
 
-  async function toggleLike(post: Post) {
-    const liked = post.likedByMe;
-    setPosts((prev) =>
-      prev.map((p) =>
-        p.id === post.id
-          ? { ...p, likedByMe: !liked, likeCount: p.likeCount + (liked ? -1 : 1) }
-          : p,
-      ),
-    );
-    try {
-      if (liked) await api.unlike(post.id);
-      else await api.like(post.id);
-    } catch {
-      setPosts((prev) =>
-        prev.map((p) =>
-          p.id === post.id
-            ? { ...p, likedByMe: liked, likeCount: p.likeCount + (liked ? 1 : -1) }
-            : p,
-        ),
-      );
+  async function react(post: Post, next: Reaction | null) {
+    setPosts((prev) => prev.map((p) => (p.id === post.id ? applyReaction(p, next) : p)));
+    if (!(await saveReaction(post, next))) {
+      setPosts((prev) => prev.map((p) => (p.id === post.id ? post : p)));
     }
+  }
+
+
+  const loadPinned = useCallback(() => {
+    api
+      .getPinnedPosts()
+      .then(setPinned)
+      .catch(() => {});
+  }, []);
+
+  useEffect(() => {
+    if (user) loadPinned();
+  }, [user, loadPinned]);
+
+  async function togglePin(post: Post) {
+    try {
+      if (post.pinned) {
+        await api.pinPost(post.id, false);
+      } else {
+        const notifyAll = window.confirm(
+          "Pin this to the top of everyone's feed.\n\nAlso send every member an announcement notification?",
+        );
+        await api.pinPost(post.id, true, notifyAll);
+      }
+      loadPinned();
+      load(tab);
+    } catch {
+      setError("Couldn't change the pin.");
+    }
+  }
+
+  async function reactPinned(post: Post, next: Reaction | null) {
+    setPinned((prev) => prev.map((p) => (p.id === post.id ? applyReaction(p, next) : p)));
+    if (!(await saveReaction(post, next))) loadPinned();
   }
 
   async function handleDelete(post: Post) {
@@ -111,13 +150,15 @@ export default function FeedPage() {
       rightRail={
         <>
           <AboutCard />
+          <LeaderboardCard />
+          <TrendingTags />
           <SuggestedMembers />
         </>
       }
     >
       <div className="space-y-4">
         <div className="flex gap-1 rounded-xl bg-black/5 p-1 dark:bg-white/5">
-          {(["feed", "explore"] as const).map((t) => (
+          {(["feed", "explore", "questions"] as const).map((t) => (
             <button
               key={t}
               type="button"
@@ -128,12 +169,35 @@ export default function FeedPage() {
                   : "text-foreground/50 hover:text-foreground/80"
               }`}
             >
-              {t === "feed" ? "For You" : "Explore"}
+              {TAB_LABELS[t]}
             </button>
           ))}
         </div>
 
-        <CreatePostComposer onSubmitted={() => load(tab)} />
+        {pinned.map((post) => (
+          <PostCard
+            key={`pinned-${post.id}`}
+            post={post}
+            onReact={reactPinned}
+            onTogglePin={isAdmin ? togglePin : undefined}
+          />
+        ))}
+
+        <WelcomeChecklist refreshKey={progressKey} onFindPeople={() => setTab("explore")} />
+        <DailyPromptCard
+          refreshKey={progressKey}
+          onAnswered={() => {
+            load(tab);
+            setProgressKey((k) => k + 1);
+          }}
+        />
+        <PushBanner />
+        <CreatePostComposer
+          onSubmitted={() => {
+            load(tab);
+            setProgressKey((k) => k + 1);
+          }}
+        />
 
         <div className="lg:hidden">
           <SuggestedMembersCarousel />
@@ -157,7 +221,9 @@ export default function FeedPage() {
             <p className="max-w-xs text-sm text-foreground/50">
               {tab === "feed"
                 ? "No posts yet from people you follow. Try Explore to discover the community."
-                : "No approved posts yet — be the first to share a success story."}
+                : tab === "questions"
+                  ? "No questions yet. Stuck on something? Tap “Ask” in the box above."
+                  : "No approved posts yet — be the first to share a success story."}
             </p>
           </div>
         ) : (
@@ -166,9 +232,10 @@ export default function FeedPage() {
               <PostCard
                 key={post.id}
                 post={post}
-                onToggleLike={toggleLike}
+                onReact={react}
                 onDelete={handleDelete}
                 onEdit={handleEdit}
+                onTogglePin={isAdmin ? togglePin : undefined}
               />
             ))}
           </div>

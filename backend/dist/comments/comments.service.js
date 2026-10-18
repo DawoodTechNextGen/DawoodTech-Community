@@ -10,14 +10,16 @@ var __metadata = (this && this.__metadata) || function (k, v) {
 var __param = (this && this.__param) || function (paramIndex, decorator) {
     return function (target, key) { decorator(target, key, paramIndex); }
 };
-import { ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
+import { BadRequestException, ForbiddenException, Injectable, NotFoundException, } from '@nestjs/common';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { Comment } from '../database/entities/comment.entity.js';
 import { Post, PostStatus } from '../database/entities/post.entity.js';
+import { UserRole } from '../database/entities/user.entity.js';
 import { NotificationEvents } from '../notifications/notification.events.js';
 import { toCommentResponse } from './comment.mapper.js';
+import { sameId } from '../common/same-id.js';
 let CommentsService = class CommentsService {
     comments;
     posts;
@@ -48,6 +50,12 @@ let CommentsService = class CommentsService {
             where: { id: comment.id },
             relations: { author: true },
         });
+        this.events.emit(NotificationEvents.MentionsPublished, {
+            postId,
+            actorId: userId,
+            text: dto.content,
+            skipUserIds: [post.userId, ...(parent ? [parent.userId] : [])],
+        });
         if (parent) {
             this.events.emit(NotificationEvents.ReplyCreated, {
                 postId,
@@ -55,23 +63,20 @@ let CommentsService = class CommentsService {
                 actorId: userId,
             });
         }
-        if (!parent || parent.userId !== post.userId) {
+        if (!parent || !sameId(parent.userId, post.userId)) {
             this.events.emit(NotificationEvents.CommentCreated, {
                 postId,
                 postOwnerId: post.userId,
                 actorId: userId,
             });
         }
-        this.events.emit(NotificationEvents.CommentPosted, {
-            postId,
-            commentId: comment.id,
-            postOwnerId: post.userId,
-            parentCommentAuthorId: parent?.userId ?? null,
-            actorId: userId,
-        });
         return toCommentResponse(withAuthor, userId);
     }
     async findByPost(postId, viewerId) {
+        const post = await this.posts.findOneBy({ id: postId });
+        if (!post || (post.status !== PostStatus.APPROVED && !sameId(post.userId, viewerId))) {
+            throw new NotFoundException('Post not found');
+        }
         const comments = await this.comments.find({
             where: { postId },
             relations: { author: true },
@@ -79,14 +84,56 @@ let CommentsService = class CommentsService {
         });
         return comments.map((c) => toCommentResponse(c, viewerId));
     }
-    async remove(id, userId) {
-        const comment = await this.comments.findOneBy({ id });
+    async remove(id, actor) {
+        const comment = await this.comments.findOne({
+            where: { id },
+            relations: { post: true },
+        });
         if (!comment)
             throw new NotFoundException('Comment not found');
-        if (comment.userId !== userId) {
+        const allowed = sameId(comment.userId, actor.id) ||
+            sameId(comment.post?.userId, actor.id) ||
+            actor.role === UserRole.ADMIN;
+        if (!allowed) {
             throw new ForbiddenException('You can only delete your own comments');
         }
         await this.comments.remove(comment);
+    }
+    async accept(id, actor) {
+        const comment = await this.comments.findOne({ where: { id }, relations: { post: true } });
+        if (!comment)
+            throw new NotFoundException('Comment not found');
+        if (!comment.post?.isQuestion)
+            throw new BadRequestException('Only answers to a question can be accepted');
+        if (!sameId(comment.post.userId, actor.id)) {
+            throw new ForbiddenException('Only the person who asked can accept an answer');
+        }
+        const wasAccepted = comment.acceptedAt !== null;
+        await this.comments.update({ postId: comment.postId }, { acceptedAt: null });
+        if (!wasAccepted) {
+            await this.comments.update({ id }, { acceptedAt: new Date() });
+            this.events.emit(NotificationEvents.AnswerAccepted, {
+                postId: comment.postId,
+                answerAuthorId: comment.userId,
+                actorId: actor.id,
+            });
+        }
+        const updated = await this.comments.findOneOrFail({
+            where: { id },
+            relations: { author: true },
+        });
+        return toCommentResponse(updated, actor.id);
+    }
+    async postIdsWithAcceptedAnswer(postIds) {
+        if (postIds.length === 0)
+            return new Set();
+        const rows = await this.comments
+            .createQueryBuilder('comment')
+            .select('DISTINCT comment.postId', 'postId')
+            .where('comment.postId IN (:...postIds)', { postIds })
+            .andWhere('comment.acceptedAt IS NOT NULL')
+            .getRawMany();
+        return new Set(rows.map((r) => Number(r.postId)));
     }
     countsByPostIds(postIds) {
         if (postIds.length === 0)

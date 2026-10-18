@@ -13,12 +13,12 @@ export declare class AuthController {
     private readonly users;
     constructor(auth: AuthService, users: UsersService);
     signup(dto: SignupDto): Promise<{
-        user: import("../users/user.mapper.js").PublicUser;
+        user: import("../users/user.mapper.js").SelfUser;
     }>;
     login(dto: LoginDto): Promise<{
         accessToken: string;
         refreshToken: string;
-        user: import("../users/user.mapper.js").PublicUser;
+        user: import("../users/user.mapper.js").SelfUser;
     }>;
     refresh(dto: RefreshDto): Promise<import("./auth.service.js").TokenPair>;
     logout(dto: RefreshDto): Promise<{
@@ -36,5 +36,5 @@ export declare class AuthController {
     resetPassword(dto: ResetPasswordDto): Promise<{
         success: boolean;
     }>;
-    me(authUser: AuthenticatedUser): Promise<import("../users/user.mapper.js").PublicUser>;
+    me(authUser: AuthenticatedUser): Promise<import("../users/user.mapper.js").SelfUser>;
 }

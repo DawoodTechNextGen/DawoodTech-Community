@@ -7,21 +7,38 @@ var __decorate = (this && this.__decorate) || function (decorators, target, key,
 import { BadRequestException, Injectable } from '@nestjs/common';
 import { randomUUID } from 'node:crypto';
 import { mkdir, writeFile } from 'node:fs/promises';
-import { extname, join } from 'node:path';
-const ALLOWED_MIME_TYPES = new Set(['image/jpeg', 'image/png', 'image/webp']);
-const MAX_SIZE_BYTES = 5 * 1024 * 1024;
+import { join } from 'node:path';
+export const MAX_UPLOAD_BYTES = 5 * 1024 * 1024;
 const UPLOAD_ROOT = join(process.cwd(), 'uploads');
+const IMAGE_SIGNATURES = [
+    {
+        ext: '.jpg',
+        matches: (b) => b.length > 3 && b[0] === 0xff && b[1] === 0xd8 && b[2] === 0xff,
+    },
+    {
+        ext: '.png',
+        matches: (b) => b.length > 8 &&
+            b.subarray(0, 8).equals(Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a])),
+    },
+    {
+        ext: '.webp',
+        matches: (b) => b.length > 12 &&
+            b.subarray(0, 4).toString('ascii') === 'RIFF' &&
+            b.subarray(8, 12).toString('ascii') === 'WEBP',
+    },
+];
 let UploadsService = class UploadsService {
     async saveImage(file, subfolder) {
-        if (!ALLOWED_MIME_TYPES.has(file.mimetype)) {
-            throw new BadRequestException('Only JPEG, PNG or WEBP images are allowed');
-        }
-        if (file.size > MAX_SIZE_BYTES) {
+        if (file.size > MAX_UPLOAD_BYTES) {
             throw new BadRequestException('Image must be 5MB or smaller');
+        }
+        const ext = IMAGE_SIGNATURES.find((s) => s.matches(file.buffer))?.ext;
+        if (!ext) {
+            throw new BadRequestException('Only JPEG, PNG or WEBP images are allowed');
         }
         const dir = join(UPLOAD_ROOT, subfolder);
         await mkdir(dir, { recursive: true });
-        const filename = `${Date.now()}-${randomUUID()}${extname(file.originalname) || '.jpg'}`;
+        const filename = `${Date.now()}-${randomUUID()}${ext}`;
         await writeFile(join(dir, filename), file.buffer);
         return `/uploads/${subfolder}/${filename}`;
     }

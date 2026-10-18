@@ -18,6 +18,9 @@ export enum NotificationType {
   LIKE = 'like',
   POST_APPROVED = 'post_approved',
   POST_REJECTED = 'post_rejected',
+  MENTION = 'mention',
+  ANNOUNCEMENT = 'announcement',
+  ANSWER_ACCEPTED = 'answer_accepted',
 }
 
 @Entity('notifications')

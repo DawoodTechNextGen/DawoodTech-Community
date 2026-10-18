@@ -5,6 +5,7 @@ import {
   HttpCode,
   HttpStatus,
   Param,
+  ParseIntPipe,
   Post,
 } from '@nestjs/common';
 import { CurrentUser } from '../common/decorators/current-user.decorator.js';
@@ -16,39 +17,33 @@ export class FollowsController {
   constructor(private readonly follows: FollowsService) {}
 
   @Post('follow')
-  async follow(
-    @Param('id') id: string,
-    @CurrentUser() user: AuthenticatedUser,
-  ) {
-    await this.follows.follow(user.id, Number(id));
+  async follow(@Param('id', ParseIntPipe) id: number, @CurrentUser() user: AuthenticatedUser) {
+    await this.follows.follow(user.id, id);
     return { success: true };
   }
 
   @Delete('follow')
   @HttpCode(HttpStatus.NO_CONTENT)
-  async unfollow(
-    @Param('id') id: string,
-    @CurrentUser() user: AuthenticatedUser,
-  ) {
-    await this.follows.unfollow(user.id, Number(id));
+  async unfollow(@Param('id', ParseIntPipe) id: number, @CurrentUser() user: AuthenticatedUser) {
+    await this.follows.unfollow(user.id, id);
   }
 
   @Get('followers')
-  async followers(@Param('id') id: string) {
-    return this.follows.listFollowers(Number(id));
+  async followers(@Param('id', ParseIntPipe) id: number) {
+    return this.follows.listFollowers(id);
   }
 
   @Get('following')
-  async following(@Param('id') id: string) {
-    return this.follows.listFollowing(Number(id));
+  async following(@Param('id', ParseIntPipe) id: number) {
+    return this.follows.listFollowing(id);
   }
 
   @Get('follow-status')
   async followStatus(
-    @Param('id') id: string,
+    @Param('id', ParseIntPipe) id: number,
     @CurrentUser() user: AuthenticatedUser,
   ) {
-    const isFollowing = await this.follows.isFollowing(user.id, Number(id));
+    const isFollowing = await this.follows.isFollowing(user.id, id);
     return { isFollowing };
   }
 }

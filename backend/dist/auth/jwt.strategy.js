@@ -7,25 +7,42 @@ var __decorate = (this && this.__decorate) || function (decorators, target, key,
 var __metadata = (this && this.__metadata) || function (k, v) {
     if (typeof Reflect === "object" && typeof Reflect.metadata === "function") return Reflect.metadata(k, v);
 };
-import { Injectable } from '@nestjs/common';
+var __param = (this && this.__param) || function (paramIndex, decorator) {
+    return function (target, key) { decorator(target, key, paramIndex); }
+};
+import { Injectable, UnauthorizedException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { PassportStrategy } from '@nestjs/passport';
+import { InjectRepository } from '@nestjs/typeorm';
 import { ExtractJwt, Strategy } from 'passport-jwt';
+import { Repository } from 'typeorm';
+import { User, UserStatus } from '../database/entities/user.entity.js';
 let JwtStrategy = class JwtStrategy extends PassportStrategy(Strategy) {
-    constructor(config) {
+    users;
+    constructor(config, users) {
         super({
             jwtFromRequest: ExtractJwt.fromAuthHeaderAsBearerToken(),
             ignoreExpiration: false,
             secretOrKey: config.get('jwt.accessSecret'),
         });
+        this.users = users;
     }
-    validate(payload) {
-        return { id: payload.sub, role: payload.role };
+    async validate(payload) {
+        const user = await this.users.findOne({
+            where: { id: payload.sub },
+            select: { id: true, role: true, status: true },
+        });
+        if (!user || user.status === UserStatus.DISABLED) {
+            throw new UnauthorizedException('ACCOUNT_DISABLED');
+        }
+        return { id: payload.sub, role: user.role };
     }
 };
 JwtStrategy = __decorate([
     Injectable(),
-    __metadata("design:paramtypes", [ConfigService])
+    __param(1, InjectRepository(User)),
+    __metadata("design:paramtypes", [ConfigService,
+        Repository])
 ], JwtStrategy);
 export { JwtStrategy };
 //# sourceMappingURL=jwt.strategy.js.map

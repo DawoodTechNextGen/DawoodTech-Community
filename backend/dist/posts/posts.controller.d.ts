@@ -14,7 +14,21 @@ export declare class PostsController {
         items: import("./post.mapper.js").PostResponse[];
         nextCursor: string | null;
     }>;
-    getOne(id: string, user: AuthenticatedUser): Promise<import("./post.mapper.js").PostResponse>;
-    update(id: string, user: AuthenticatedUser, dto: UpdatePostDto): Promise<import("./post.mapper.js").PostResponse>;
-    remove(id: string, user: AuthenticatedUser): Promise<void>;
+    questions(user: AuthenticatedUser, cursor?: string): Promise<{
+        items: import("./post.mapper.js").PostResponse[];
+        nextCursor: string | null;
+    }>;
+    trendingTags(): Promise<{
+        tag: string;
+        count: number;
+    }[]>;
+    byTag(tag: string, user: AuthenticatedUser, cursor?: string): Promise<{
+        items: import("./post.mapper.js").PostResponse[];
+        nextCursor: string | null;
+    }>;
+    search(user: AuthenticatedUser, q?: string): Promise<never[] | import("./post.mapper.js").PostResponse[]>;
+    pinned(user: AuthenticatedUser): Promise<import("./post.mapper.js").PostResponse[]>;
+    getOne(id: number, user: AuthenticatedUser): Promise<import("./post.mapper.js").PostResponse>;
+    update(id: number, user: AuthenticatedUser, dto: UpdatePostDto): Promise<import("./post.mapper.js").PostResponse>;
+    remove(id: number, user: AuthenticatedUser): Promise<void>;
 }

@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Param, Post } from '@nestjs/common';
+import { Body, Controller, Get, Param, ParseIntPipe, Post } from '@nestjs/common';
 import { CurrentUser } from '../common/decorators/current-user.decorator.js';
 import type { AuthenticatedUser } from '../auth/jwt.strategy.js';
 import { CommentsService } from './comments.service.js';
@@ -10,18 +10,18 @@ export class PostCommentsController {
 
   @Post()
   async create(
-    @Param('postId') postId: string,
+    @Param('postId', ParseIntPipe) postId: number,
     @CurrentUser() user: AuthenticatedUser,
     @Body() dto: CreateCommentDto,
   ) {
-    return this.comments.create(Number(postId), user.id, dto);
+    return this.comments.create(postId, user.id, dto);
   }
 
   @Get()
   async list(
-    @Param('postId') postId: string,
+    @Param('postId', ParseIntPipe) postId: number,
     @CurrentUser() user: AuthenticatedUser,
   ) {
-    return this.comments.findByPost(Number(postId), user.id);
+    return this.comments.findByPost(postId, user.id);
   }
 }

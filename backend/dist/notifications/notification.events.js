@@ -5,6 +5,12 @@ export const NotificationEvents = {
     LikeCreated: 'like.created',
     PostApproved: 'post.approved',
     PostRejected: 'post.rejected',
-    CommentPosted: 'comment.posted',
+    PendingPostsChanged: 'posts.pending-changed',
+    MentionsPublished: 'mentions.published',
+    AnnouncementPinned: 'announcement.pinned',
+    AnswerAccepted: 'answer.accepted',
+    PostSubmitted: 'post.submitted',
+    UserVerified: 'user.verified',
+    UserAccessChanged: 'user.access-changed',
 };
 //# sourceMappingURL=notification.events.js.map

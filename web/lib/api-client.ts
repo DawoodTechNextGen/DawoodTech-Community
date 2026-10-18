@@ -2,18 +2,22 @@ import { tokenStorage } from "./token-storage";
 import type {
   AccountStatus,
   AdminUser,
+  AdminStats,
   AuthResponse,
   AuthTokens,
+  Badge,
+  Leaderboard,
   Comment,
   PaginatedNotifications,
   PaginatedPosts,
-  PostEmailStatsResponse,
   Post,
   PublicUser,
+  Reaction,
+  TodayPrompt,
   UserRole,
 } from "./types";
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:3000";
+export const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:3000";
 
 export class ApiError extends Error {
   constructor(
@@ -46,8 +50,9 @@ async function doRefresh(): Promise<string | null> {
 }
 
 /** Serializes concurrent refresh attempts into a single in-flight request,
- *  so parallel 401s don't each fire their own /auth/refresh call. */
-function refreshAccessToken(): Promise<string | null> {
+ *  so parallel 401s don't each fire their own /auth/refresh call. Also used
+ *  by the live-notifications socket when its token is rejected. */
+export function refreshAccessToken(): Promise<string | null> {
   refreshPromise ??= doRefresh().finally(() => {
     refreshPromise = null;
   });
@@ -131,9 +136,20 @@ export interface LoginInput {
   password: string;
 }
 
+export interface OnboardingProgress {
+  hasAvatar: boolean;
+  hasBio: boolean;
+  followingCount: number;
+  postCount: number;
+}
+
 export interface CreatePostInput {
   content: string;
   mediaUrls?: string[];
+  /** Answering today's daily question. */
+  answersPrompt?: boolean;
+  /** Asking the community a question. */
+  isQuestion?: boolean;
 }
 
 export interface UpdateProfileInput {
@@ -151,6 +167,8 @@ export const api = {
   async logout() {
     const tokens = tokenStorage.get();
     if (tokens) {
+      // Lazy import: push.ts imports this module.
+      await import("./push").then((m) => m.forgetPushOnSignOut()).catch(() => {});
       await request("/auth/logout", {
         method: "POST",
         body: { refreshToken: tokens.refreshToken },
@@ -189,6 +207,18 @@ export const api = {
     request<PaginatedPosts>(
       `/posts/explore${cursor ? `?cursor=${encodeURIComponent(cursor)}` : ""}`,
     ),
+  getQuestions: (cursor?: string) =>
+    request<PaginatedPosts>(
+      `/posts/questions${cursor ? `?cursor=${encodeURIComponent(cursor)}` : ""}`,
+    ),
+  getTagPosts: (tag: string, cursor?: string) =>
+    request<PaginatedPosts>(
+      `/posts/tags/${encodeURIComponent(tag)}${cursor ? `?cursor=${encodeURIComponent(cursor)}` : ""}`,
+    ),
+  getTrendingTags: () => request<{ tag: string; count: number }[]>("/posts/tags/trending"),
+  searchPosts: (query: string) => request<Post[]>(`/posts/search?q=${encodeURIComponent(query)}`),
+  acceptAnswer: (commentId: string) =>
+    request<Comment>(`/comments/${commentId}/accept`, { method: "PATCH" }),
   getPost: (id: string) => request<Post>(`/posts/${id}`),
   createPost: (dto: CreatePostInput) =>
     request<Post>("/posts", { method: "POST", body: dto }),
@@ -196,7 +226,11 @@ export const api = {
     request<Post>(`/posts/${id}`, { method: "PATCH", body: dto }),
   deletePost: (id: string) => request<void>(`/posts/${id}`, { method: "DELETE" }),
 
-  like: (postId: string) => request<{ success: true }>(`/posts/${postId}/like`, { method: "POST" }),
+  like: (postId: string, reaction?: Reaction) =>
+    request<{ success: true }>(`/posts/${postId}/like`, {
+      method: "POST",
+      body: reaction ? { reaction } : undefined,
+    }),
   unlike: (postId: string) => request<void>(`/posts/${postId}/like`, { method: "DELETE" }),
 
   getComments: (postId: string) => request<Comment[]>(`/posts/${postId}/comments`),
@@ -217,11 +251,26 @@ export const api = {
   markAllNotificationsRead: () =>
     request<{ success: true }>("/notifications/read-all", { method: "PATCH" }),
 
+  getPushPublicKey: () => request<{ publicKey: string | null }>("/push/public-key"),
+  subscribePush: (subscription: PushSubscriptionJSON) =>
+    request<void>("/push/subscribe", {
+      method: "POST",
+      body: { endpoint: subscription.endpoint, keys: subscription.keys },
+    }),
+  unsubscribePush: (endpoint: string) =>
+    request<void>("/push/unsubscribe", { method: "POST", body: { endpoint } }),
+
+  getReviewStats: () =>
+    request<{ pending: number; avgWaitMinutes: number | null; reviewed30d: number }>(
+      "/admin/posts/stats",
+    ),
+  getPinnedPosts: () => request<Post[]>("/posts/pinned"),
+  pinPost: (id: string, pinned: boolean, notifyAll = false) =>
+    request<Post>(`/admin/posts/${id}/pin`, { method: "PATCH", body: { pinned, notifyAll } }),
+  getAdminStats: () => request<AdminStats>("/admin/stats"),
   getPendingPosts: () => request<Post[]>("/admin/posts/pending"),
-  approvePost: (id: string, notifyInterns: boolean) =>
-    request<Post>(`/admin/posts/${id}/approve`, { method: "PATCH", body: { notifyInterns } }),
+  approvePost: (id: string) => request<Post>(`/admin/posts/${id}/approve`, { method: "PATCH" }),
   rejectPost: (id: string) => request<Post>(`/admin/posts/${id}/reject`, { method: "PATCH" }),
-  getPostEmailStats: () => request<PostEmailStatsResponse>("/admin/post-emails/stats"),
 
   getAdminUsers: () => request<AdminUser[]>("/admin/users"),
   setUserStatus: (id: string, status: AccountStatus) =>
@@ -230,6 +279,10 @@ export const api = {
     request<AdminUser>(`/admin/users/${id}/role`, { method: "PATCH", body: { role } }),
 
   getUser: (id: string) => request<PublicUser>(`/users/${id}`),
+  getUserByUsername: (username: string) =>
+    request<PublicUser>(`/users/by-username/${encodeURIComponent(username)}`),
+  searchUsers: (query: string) =>
+    request<PublicUser[]>(`/users?search=${encodeURIComponent(query)}`),
   getUserPosts: (id: string) => request<Post[]>(`/users/${id}/posts`),
   updateMe: (dto: UpdateProfileInput) =>
     request<PublicUser>("/users/me", { method: "PATCH", body: dto }),
@@ -241,5 +294,9 @@ export const api = {
     request<{ isFollowing: boolean }>(`/users/${id}/follow-status`),
   getFollowers: (id: string) => request<PublicUser[]>(`/users/${id}/followers`),
   getFollowing: (id: string) => request<PublicUser[]>(`/users/${id}/following`),
+  getTodayPrompt: () => request<TodayPrompt>("/prompts/today"),
+  getLeaderboard: () => request<Leaderboard>("/community/leaderboard"),
+  getBadges: (userId: string) => request<Badge[]>(`/users/${userId}/badges`),
+  getOnboardingProgress: () => request<OnboardingProgress>("/users/me/progress"),
   getSuggestedUsers: () => request<PublicUser[]>("/users/suggestions"),
 };

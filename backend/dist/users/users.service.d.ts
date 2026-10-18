@@ -1,9 +1,11 @@
+import { EventEmitter2 } from '@nestjs/event-emitter';
 import { Repository } from 'typeorm';
 import { User, UserRole, UserStatus } from '../database/entities/user.entity.js';
 import type { UpdateProfileDto } from './dto/update-profile.dto.js';
 export declare class UsersService {
     private readonly users;
-    constructor(users: Repository<User>);
+    private readonly events;
+    constructor(users: Repository<User>, events: EventEmitter2);
     findByIdOrFail(id: number): Promise<User>;
     findByUsernameOrFail(username: string): Promise<User>;
     search(query: string): Promise<User[]>;

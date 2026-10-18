@@ -3,9 +3,10 @@ import { EventEmitter2 } from '@nestjs/event-emitter';
 import { InjectRepository } from '@nestjs/typeorm';
 import { In, Repository } from 'typeorm';
 import { Follow } from '../database/entities/follow.entity.js';
-import { User } from '../database/entities/user.entity.js';
+import { User, UserStatus } from '../database/entities/user.entity.js';
 import { NotificationEvents } from '../notifications/notification.events.js';
 import { toPublicUser, type PublicUser } from '../users/user.mapper.js';
+import { sameId } from '../common/same-id.js';
 
 @Injectable()
 export class FollowsService {
@@ -16,7 +17,7 @@ export class FollowsService {
   ) {}
 
   async follow(followerId: number, followingId: number): Promise<void> {
-    if (followerId === followingId) {
+    if (sameId(followerId, followingId)) {
       throw new BadRequestException('You cannot follow yourself');
     }
     const target = await this.users.findOneBy({ id: followingId });
@@ -26,7 +27,10 @@ export class FollowsService {
     if (existing) return;
 
     await this.follows.save(this.follows.create({ followerId, followingId }));
-    this.events.emit(NotificationEvents.FollowCreated, { followingId, followerId });
+    this.events.emit(NotificationEvents.FollowCreated, {
+      followingId,
+      followerId,
+    });
   }
 
   async unfollow(followerId: number, followingId: number): Promise<void> {
@@ -47,7 +51,10 @@ export class FollowsService {
     const rows = await this.follows.find({ where: { followingId: userId } });
     if (rows.length === 0) return [];
     const users = await this.users.find({
-      where: { id: In(rows.map((r) => r.followerId)) },
+      where: {
+        id: In(rows.map((r) => r.followerId)),
+        status: UserStatus.ACTIVE,
+      },
     });
     return users.map(toPublicUser);
   }
@@ -56,7 +63,10 @@ export class FollowsService {
     const rows = await this.follows.find({ where: { followerId: userId } });
     if (rows.length === 0) return [];
     const users = await this.users.find({
-      where: { id: In(rows.map((r) => r.followingId)) },
+      where: {
+        id: In(rows.map((r) => r.followingId)),
+        status: UserStatus.ACTIVE,
+      },
     });
     return users.map(toPublicUser);
   }

@@ -5,13 +5,15 @@ import { useParams } from "next/navigation";
 import { useCallback, useEffect, useState } from "react";
 import { AppShell } from "@/components/layout/app-shell";
 import { FollowListModal } from "@/components/profile/follow-list-modal";
+import { ProfileBadges } from "@/components/profile/badges";
 import { ProfileHeader } from "@/components/profile/profile-header";
 import { PostCard } from "@/components/posts/post-card";
 import { PostCardSkeleton } from "@/components/posts/post-card-skeleton";
 import { ErrorBanner } from "@/components/ui/error-banner";
 import { api } from "@/lib/api-client";
 import { useAuth } from "@/lib/auth-context";
-import type { Post, PublicUser } from "@/lib/types";
+import { applyReaction, saveReaction } from "@/lib/reactions";
+import type { Post, PublicUser, Reaction } from "@/lib/types";
 import { useRequireAuth } from "@/lib/use-require-auth";
 
 export default function ProfilePage() {
@@ -82,28 +84,13 @@ export default function ProfilePage() {
     if (isOwnProfile) updateUser(updated);
   }
 
-  async function toggleLike(post: Post) {
-    const liked = post.likedByMe;
-    setPosts((prev) =>
-      prev.map((p) =>
-        p.id === post.id
-          ? { ...p, likedByMe: !liked, likeCount: p.likeCount + (liked ? -1 : 1) }
-          : p,
-      ),
-    );
-    try {
-      if (liked) await api.unlike(post.id);
-      else await api.like(post.id);
-    } catch {
-      setPosts((prev) =>
-        prev.map((p) =>
-          p.id === post.id
-            ? { ...p, likedByMe: liked, likeCount: p.likeCount + (liked ? 1 : -1) }
-            : p,
-        ),
-      );
+  async function react(post: Post, next: Reaction | null) {
+    setPosts((prev) => prev.map((p) => (p.id === post.id ? applyReaction(p, next) : p)));
+    if (!(await saveReaction(post, next))) {
+      setPosts((prev) => prev.map((p) => (p.id === post.id ? post : p)));
     }
   }
+
 
   async function handleDelete(post: Post) {
     setPosts((prev) => prev.filter((p) => p.id !== post.id));
@@ -161,6 +148,8 @@ export default function ProfilePage() {
           )
         )}
 
+        {profile && <ProfileBadges userId={profile.id} isOwnProfile={isOwnProfile} />}
+
         <div className="space-y-3">
           {loading ? (
             <>
@@ -181,7 +170,7 @@ export default function ProfilePage() {
               <PostCard
                 key={post.id}
                 post={post}
-                onToggleLike={toggleLike}
+                onReact={react}
                 onDelete={isOwnProfile ? handleDelete : undefined}
                 onEdit={isOwnProfile ? handleEdit : undefined}
               />

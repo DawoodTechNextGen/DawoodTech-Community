@@ -19,7 +19,7 @@ import { Brackets, DataSource, Repository } from 'typeorm';
 import { User, UserStatus } from '../database/entities/user.entity.js';
 import { MailService } from '../mail/mail.service.js';
 import { verifyEmailTemplate } from '../mail/templates.js';
-import { errorMessage, hourlyAllowance, withAdvisoryLock, } from '../post-emails/email-worker-utils.js';
+import { errorMessage, hourlyAllowance, withAdvisoryLock } from '../mail/mail-utils.js';
 const TOKEN_EXPIRES_IN = '1h';
 const MAX_ATTEMPTS = 3;
 const LOCK = 'dawoodtech_community_verification_emails';
@@ -72,7 +72,7 @@ let VerificationEmailsService = VerificationEmailsService_1 = class Verification
                 }))
                     .orderBy('u.id', 'ASC');
                 const total = await query.getCount();
-                const allowance = await hourlyAllowance(this.dataSource, this.config.get('postEmails.hourlyLimit') ?? 20);
+                const allowance = await hourlyAllowance(this.dataSource, this.config.get('emailHourlyLimit') ?? 20);
                 const batch = allowance > 0 ? await query.take(allowance).getMany() : [];
                 let sent = 0;
                 let failed = 0;

@@ -1,3 +1,21 @@
+const DEV_SECRETS = {
+  JWT_ACCESS_SECRET: 'dev-access-secret',
+  JWT_REFRESH_SECRET: 'dev-refresh-secret',
+  JWT_EMAIL_TOKEN_SECRET: 'dev-email-token-secret',
+} as const;
+
+/** A JWT secret from the environment. The well-known dev fallback is only
+ *  allowed when NODE_ENV is explicitly development or test — anywhere else a
+ *  missing secret would let anyone sign their own (admin) tokens. */
+function secret(name: keyof typeof DEV_SECRETS): string {
+  const value = process.env[name];
+  if (value && !value.startsWith('change-me')) return value;
+  if (process.env.NODE_ENV === 'development' || process.env.NODE_ENV === 'test') {
+    return value || DEV_SECRETS[name];
+  }
+  throw new Error(`${name} must be set to a long random value in .env`);
+}
+
 export default () => ({
   nodeEnv: process.env.NODE_ENV ?? 'development',
   port: parseInt(process.env.PORT ?? '3000', 10),
@@ -7,26 +25,22 @@ export default () => ({
     username: process.env.DB_USERNAME ?? 'root',
     password: process.env.DB_PASSWORD ?? '',
     database: process.env.DB_DATABASE ?? 'dawoodtech_community',
+    synchronize: process.env.DB_SYNCHRONIZE === 'true',
   },
+  // How many reverse proxies sit in front of the API (cPanel/LiteSpeed = 1),
+  // so rate limits see the visitor's real IP instead of the proxy's.
+  trustProxy: parseInt(process.env.TRUST_PROXY ?? '1', 10),
   jwt: {
-    accessSecret: process.env.JWT_ACCESS_SECRET ?? 'dev-access-secret',
+    accessSecret: secret('JWT_ACCESS_SECRET'),
     accessExpiresIn: process.env.JWT_ACCESS_EXPIRES_IN ?? '15m',
-    refreshSecret: process.env.JWT_REFRESH_SECRET ?? 'dev-refresh-secret',
+    refreshSecret: secret('JWT_REFRESH_SECRET'),
     refreshExpiresIn: process.env.JWT_REFRESH_EXPIRES_IN ?? '30d',
-    emailTokenSecret: process.env.JWT_EMAIL_TOKEN_SECRET ?? 'dev-email-token-secret',
+    emailTokenSecret: secret('JWT_EMAIL_TOKEN_SECRET'),
   },
   corsOrigins: (process.env.CORS_ORIGINS ?? 'http://localhost:5173')
     .split(',')
     .map((origin) => origin.trim()),
   frontendUrl: process.env.FRONTEND_URL ?? 'http://localhost:3001',
-  // Public site used for links in outgoing notification emails.
-  communityUrl: (
-    process.env.COMMUNITY_URL ||
-    process.env.FRONTEND_URL ||
-    'http://localhost:3001'
-  ).replace(/\/+$/, ''),
-  // Public URL of this API — uploaded images (/uploads/...) in emails are served from here.
-  apiPublicUrl: (process.env.API_PUBLIC_URL || 'http://localhost:3000').replace(/\/+$/, ''),
   // MAIL_* are the keys TaskDesk uses, so the same values can be copied over;
   // the older SMTP_* / MAIL_FROM keys still work as a fallback.
   smtp: {
@@ -44,38 +58,20 @@ export default () => ({
         }
       : (process.env.MAIL_FROM ?? 'DawoodTech Community <no-reply@dawoodtechnextgen.com>'),
   },
-  // Read-only connection to TaskDesk, the source of "new post" email recipients.
-  taskdeskDb: {
-    host: process.env.TASKDESK_DB_HOST || process.env.DB_HOST || '127.0.0.1',
-    port: parseInt(process.env.TASKDESK_DB_PORT || process.env.DB_PORT || '3306', 10),
-    user: process.env.TASKDESK_DB_USER ?? '',
-    password: process.env.TASKDESK_DB_PASS ?? '',
-    database: process.env.TASKDESK_DB_NAME || 'task_management',
-    // Only interns from the last N months get the digest (TaskDesk accounts
-    // stay active after an internship ends).
-    recentMonths: parseInt(process.env.TASKDESK_RECENT_MONTHS ?? '3', 10),
-  },
-  postEmails: {
-    // live    — queue every TaskDesk intern
-    // test    — queue only POST_EMAIL_TEST_RECIPIENT, so one real email goes out
-    // dry_run — queue nothing; log the recipient list that *would* be queued
-    mode: (process.env.POST_EMAIL_MODE ?? 'dry_run') as 'live' | 'test' | 'dry_run',
-    testRecipient: process.env.POST_EMAIL_TEST_RECIPIENT ?? '',
-    batchSize: parseInt(process.env.POST_EMAIL_BATCH_SIZE ?? '50', 10),
-    delayMs: parseInt(process.env.POST_EMAIL_DELAY_MS ?? '1000', 10),
-    maxAttempts: 3,
-    // Most queued (new-post + activity) emails the cron may send in any rolling
-    // hour. Keep it below the mail server's own hourly cap so signup, password
-    // reset and verification emails always have room left.
-    hourlyLimit: parseInt(process.env.EMAIL_HOURLY_LIMIT ?? '20', 10),
-    // New posts go out as one daily digest, built on the first cron run after
-    // this hour (0-23) in DIGEST_TIMEZONE.
-    digestHour: parseInt(process.env.DIGEST_HOUR ?? '9', 10),
-    digestTimeZone: process.env.DIGEST_TIMEZONE || 'Asia/Karachi',
-    // Like/comment/reply emails to community members. Same modes as above; in
-    // test mode they're all redirected to POST_EMAIL_TEST_RECIPIENT.
-    activityMode: (process.env.ACTIVITY_EMAIL_MODE ??
-      process.env.POST_EMAIL_MODE ??
-      'dry_run') as 'live' | 'test' | 'dry_run',
+  // Most verification emails the background retry may send in any rolling
+  // hour. Keep it below the mail server's own hourly cap so signup and
+  // password-reset emails always have room left.
+  // Members with this many approved posts (and no rejection in 30 days) skip
+  // the review queue. 0 = every member's post is reviewed. Staff always skip.
+  // The community's calendar: when "today" starts for daily questions and streaks.
+  timeZone: process.env.APP_TIMEZONE || 'Asia/Karachi',
+  autoApproveAfter: parseInt(process.env.AUTO_APPROVE_AFTER ?? '3', 10),
+  emailHourlyLimit: parseInt(process.env.EMAIL_HOURLY_LIMIT ?? '20', 10),
+  // Web Push (VAPID). Generate once with `npx web-push generate-vapid-keys`;
+  // push stays off while these are empty.
+  push: {
+    publicKey: process.env.VAPID_PUBLIC_KEY ?? '',
+    privateKey: process.env.VAPID_PRIVATE_KEY ?? '',
+    subject: process.env.VAPID_SUBJECT || 'mailto:no-reply@dawoodtechnextgen.com',
   },
 });

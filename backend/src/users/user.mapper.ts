@@ -1,8 +1,8 @@
 import type { User } from '../database/entities/user.entity.js';
 
+/** What any member may see about another member — no email address. */
 export interface PublicUser {
   id: number;
-  email: string;
   username: string;
   fullName: string;
   bio: string | null;
@@ -13,7 +13,6 @@ export interface PublicUser {
 export function toPublicUser(user: User): PublicUser {
   return {
     id: user.id,
-    email: user.email,
     username: user.username,
     fullName: user.fullName,
     bio: user.bio,
@@ -22,14 +21,23 @@ export function toPublicUser(user: User): PublicUser {
   };
 }
 
-export interface AdminUserResponse extends PublicUser {
+/** The signed-in member's own account, including their email. */
+export interface SelfUser extends PublicUser {
+  email: string;
+}
+
+export function toSelfUser(user: User): SelfUser {
+  return { ...toPublicUser(user), email: user.email };
+}
+
+export interface AdminUserResponse extends SelfUser {
   status: string;
   createdAt: string;
 }
 
 export function toAdminUserResponse(user: User): AdminUserResponse {
   return {
-    ...toPublicUser(user),
+    ...toSelfUser(user),
     status: user.status,
     createdAt: user.createdAt.toISOString(),
   };

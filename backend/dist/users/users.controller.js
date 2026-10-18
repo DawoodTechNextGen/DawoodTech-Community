@@ -10,11 +10,11 @@ var __metadata = (this && this.__metadata) || function (k, v) {
 var __param = (this && this.__param) || function (paramIndex, decorator) {
     return function (target, key) { decorator(target, key, paramIndex); }
 };
-import { Body, Controller, Get, Param, Patch, Query } from '@nestjs/common';
+import { Body, Controller, Get, Param, ParseIntPipe, Patch, Query } from '@nestjs/common';
 import { CurrentUser } from '../common/decorators/current-user.decorator.js';
 import { FollowsService } from '../follows/follows.service.js';
 import { PostsService } from '../posts/posts.service.js';
-import { toPublicUser } from './user.mapper.js';
+import { toPublicUser, toSelfUser } from './user.mapper.js';
 import { UpdateProfileDto } from './dto/update-profile.dto.js';
 import { UsersService } from './users.service.js';
 const SUGGESTIONS_LIMIT = 5;
@@ -40,18 +40,31 @@ let UsersController = class UsersController {
     }
     async updateMe(authUser, dto) {
         const user = await this.users.updateProfile(authUser.id, dto);
-        return toPublicUser(user);
+        return toSelfUser(user);
     }
     async getByUsername(username) {
         const user = await this.users.findByUsernameOrFail(username);
         return toPublicUser(user);
     }
+    async progress(authUser) {
+        const [user, followedIds, postCount] = await Promise.all([
+            this.users.findByIdOrFail(authUser.id),
+            this.follows.getFollowedIds(authUser.id),
+            this.posts.countByUser(authUser.id),
+        ]);
+        return {
+            hasAvatar: !!user.avatarUrl,
+            hasBio: !!user.bio?.trim(),
+            followingCount: followedIds.length,
+            postCount,
+        };
+    }
     async getById(id) {
-        const user = await this.users.findByIdOrFail(Number(id));
+        const user = await this.users.findByIdOrFail(id);
         return toPublicUser(user);
     }
     async getPostsByUser(id, authUser) {
-        return this.posts.findByUser(Number(id), authUser?.id);
+        return this.posts.findByUser(id, authUser?.id);
     }
 };
 __decorate([
@@ -84,18 +97,25 @@ __decorate([
     __metadata("design:returntype", Promise)
 ], UsersController.prototype, "getByUsername", null);
 __decorate([
-    Get(':id'),
-    __param(0, Param('id')),
+    Get('me/progress'),
+    __param(0, CurrentUser()),
     __metadata("design:type", Function),
-    __metadata("design:paramtypes", [String]),
+    __metadata("design:paramtypes", [Object]),
+    __metadata("design:returntype", Promise)
+], UsersController.prototype, "progress", null);
+__decorate([
+    Get(':id'),
+    __param(0, Param('id', ParseIntPipe)),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", [Number]),
     __metadata("design:returntype", Promise)
 ], UsersController.prototype, "getById", null);
 __decorate([
     Get(':id/posts'),
-    __param(0, Param('id')),
+    __param(0, Param('id', ParseIntPipe)),
     __param(1, CurrentUser()),
     __metadata("design:type", Function),
-    __metadata("design:paramtypes", [String, Object]),
+    __metadata("design:paramtypes", [Number, Object]),
     __metadata("design:returntype", Promise)
 ], UsersController.prototype, "getPostsByUser", null);
 UsersController = __decorate([

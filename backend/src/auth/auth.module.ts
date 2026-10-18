@@ -2,6 +2,7 @@ import { Module } from '@nestjs/common';
 import { JwtModule } from '@nestjs/jwt';
 import { PassportModule } from '@nestjs/passport';
 import { TypeOrmModule } from '@nestjs/typeorm';
+import { Follow } from '../database/entities/follow.entity.js';
 import { RefreshToken } from '../database/entities/refresh-token.entity.js';
 import { User } from '../database/entities/user.entity.js';
 import { MailModule } from '../mail/mail.module.js';
@@ -13,7 +14,7 @@ import { VerificationEmailsModule } from './verification-emails.module.js';
 
 @Module({
   imports: [
-    TypeOrmModule.forFeature([User, RefreshToken]),
+    TypeOrmModule.forFeature([User, RefreshToken, Follow]),
     PassportModule,
     JwtModule.register({}),
     UsersModule,

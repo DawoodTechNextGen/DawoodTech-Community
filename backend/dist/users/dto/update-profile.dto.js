@@ -7,7 +7,8 @@ var __decorate = (this && this.__decorate) || function (decorators, target, key,
 var __metadata = (this && this.__metadata) || function (k, v) {
     if (typeof Reflect === "object" && typeof Reflect.metadata === "function") return Reflect.metadata(k, v);
 };
-import { IsOptional, IsString, MaxLength, MinLength } from 'class-validator';
+import { IsOptional, IsString, Matches, MaxLength, MinLength } from 'class-validator';
+import { UPLOAD_URL_MESSAGE, UPLOAD_URL_PATTERN } from '../../uploads/upload-url.js';
 export class UpdateProfileDto {
     fullName;
     bio;
@@ -30,6 +31,7 @@ __decorate([
     IsOptional(),
     IsString(),
     MaxLength(500),
+    Matches(UPLOAD_URL_PATTERN, { message: UPLOAD_URL_MESSAGE }),
     __metadata("design:type", String)
 ], UpdateProfileDto.prototype, "avatarUrl", void 0);
 //# sourceMappingURL=update-profile.dto.js.map

@@ -10,5 +10,6 @@ export declare class Comment {
     content: string;
     parentId: number | null;
     parent: Relation<Comment> | null;
+    acceptedAt: Date | null;
     createdAt: Date;
 }

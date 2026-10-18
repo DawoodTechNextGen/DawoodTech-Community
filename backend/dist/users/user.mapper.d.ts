@@ -1,7 +1,6 @@
 import type { User } from '../database/entities/user.entity.js';
 export interface PublicUser {
     id: number;
-    email: string;
     username: string;
     fullName: string;
     bio: string | null;
@@ -9,7 +8,11 @@ export interface PublicUser {
     role: string;
 }
 export declare function toPublicUser(user: User): PublicUser;
-export interface AdminUserResponse extends PublicUser {
+export interface SelfUser extends PublicUser {
+    email: string;
+}
+export declare function toSelfUser(user: User): SelfUser;
+export interface AdminUserResponse extends SelfUser {
     status: string;
     createdAt: string;
 }

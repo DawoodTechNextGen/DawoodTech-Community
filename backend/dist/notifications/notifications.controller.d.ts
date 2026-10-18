@@ -10,7 +10,7 @@ export declare class NotificationsController {
     unreadCount(user: AuthenticatedUser): Promise<{
         count: number;
     }>;
-    markRead(id: string, user: AuthenticatedUser): Promise<{
+    markRead(id: number, user: AuthenticatedUser): Promise<{
         success: boolean;
     }>;
     markAllRead(user: AuthenticatedUser): Promise<{

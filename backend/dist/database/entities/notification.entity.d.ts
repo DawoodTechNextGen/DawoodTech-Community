@@ -7,7 +7,10 @@ export declare enum NotificationType {
     FOLLOW = "follow",
     LIKE = "like",
     POST_APPROVED = "post_approved",
-    POST_REJECTED = "post_rejected"
+    POST_REJECTED = "post_rejected",
+    MENTION = "mention",
+    ANNOUNCEMENT = "announcement",
+    ANSWER_ACCEPTED = "answer_accepted"
 }
 export declare class Notification {
     id: number;

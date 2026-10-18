@@ -10,6 +10,7 @@ var __metadata = (this && this.__metadata) || function (k, v) {
 import { Column, CreateDateColumn, Entity, Index, JoinColumn, ManyToOne, OneToMany, PrimaryGeneratedColumn, UpdateDateColumn, } from 'typeorm';
 import { User } from './user.entity.js';
 import { PostMedia } from './post-media.entity.js';
+import { MilestoneKind } from './milestone.entity.js';
 export var PostStatus;
 (function (PostStatus) {
     PostStatus["PENDING"] = "pending";
@@ -24,8 +25,11 @@ let Post = class Post {
     status;
     reviewedBy;
     reviewedAt;
-    notifyByEmail;
-    notifiedAt;
+    promptDay;
+    promptText;
+    isQuestion;
+    pinnedAt;
+    milestone;
     media;
     createdAt;
     updatedAt;
@@ -62,13 +66,28 @@ __decorate([
     __metadata("design:type", Object)
 ], Post.prototype, "reviewedAt", void 0);
 __decorate([
-    Column({ name: 'notify_by_email', type: 'boolean', default: false }),
-    __metadata("design:type", Boolean)
-], Post.prototype, "notifyByEmail", void 0);
-__decorate([
-    Column({ name: 'notified_at', type: 'datetime', nullable: true }),
+    Index(),
+    Column({ name: 'prompt_day', type: 'char', length: 10, nullable: true }),
     __metadata("design:type", Object)
-], Post.prototype, "notifiedAt", void 0);
+], Post.prototype, "promptDay", void 0);
+__decorate([
+    Column({ name: 'prompt_text', type: 'varchar', length: 255, nullable: true }),
+    __metadata("design:type", Object)
+], Post.prototype, "promptText", void 0);
+__decorate([
+    Index(),
+    Column({ name: 'is_question', type: 'boolean', default: false }),
+    __metadata("design:type", Boolean)
+], Post.prototype, "isQuestion", void 0);
+__decorate([
+    Index(),
+    Column({ name: 'pinned_at', type: 'datetime', nullable: true }),
+    __metadata("design:type", Object)
+], Post.prototype, "pinnedAt", void 0);
+__decorate([
+    Column({ type: 'enum', enum: MilestoneKind, nullable: true }),
+    __metadata("design:type", Object)
+], Post.prototype, "milestone", void 0);
 __decorate([
     OneToMany(() => PostMedia, (media) => media.post),
     __metadata("design:type", Array)

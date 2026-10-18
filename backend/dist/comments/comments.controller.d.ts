@@ -3,5 +3,6 @@ import { CommentsService } from './comments.service.js';
 export declare class CommentsController {
     private readonly comments;
     constructor(comments: CommentsService);
-    remove(id: string, user: AuthenticatedUser): Promise<void>;
+    accept(id: number, user: AuthenticatedUser): Promise<import("./comment.mapper.js").CommentResponse>;
+    remove(id: number, user: AuthenticatedUser): Promise<void>;
 }

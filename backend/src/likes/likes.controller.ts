@@ -5,11 +5,14 @@ import {
   HttpCode,
   HttpStatus,
   Param,
+  ParseIntPipe,
   Post,
+  Body,
 } from '@nestjs/common';
 import { CurrentUser } from '../common/decorators/current-user.decorator.js';
 import type { AuthenticatedUser } from '../auth/jwt.strategy.js';
 import { LikesService } from './likes.service.js';
+import { ReactDto } from './dto/react.dto.js';
 
 @Controller('posts/:id')
 export class LikesController {
@@ -17,24 +20,22 @@ export class LikesController {
 
   @Post('like')
   async like(
-    @Param('id') id: string,
+    @Param('id', ParseIntPipe) id: number,
     @CurrentUser() user: AuthenticatedUser,
+    @Body() dto: ReactDto,
   ) {
-    await this.likes.like(Number(id), user.id);
+    await this.likes.like(id, user.id, dto.reaction);
     return { success: true };
   }
 
   @Delete('like')
   @HttpCode(HttpStatus.NO_CONTENT)
-  async unlike(
-    @Param('id') id: string,
-    @CurrentUser() user: AuthenticatedUser,
-  ) {
-    await this.likes.unlike(Number(id), user.id);
+  async unlike(@Param('id', ParseIntPipe) id: number, @CurrentUser() user: AuthenticatedUser) {
+    await this.likes.unlike(id, user.id);
   }
 
   @Get('likes')
-  async likers(@Param('id') id: string) {
-    return this.likes.listLikers(Number(id));
+  async likers(@Param('id', ParseIntPipe) id: number) {
+    return this.likes.listLikers(id);
   }
 }

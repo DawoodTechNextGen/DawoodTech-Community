@@ -12,6 +12,7 @@ import {
 } from 'typeorm';
 import { User } from './user.entity.js';
 import { PostMedia } from './post-media.entity.js';
+import { MilestoneKind } from './milestone.entity.js';
 
 export enum PostStatus {
   PENDING = 'pending',
@@ -45,13 +46,28 @@ export class Post {
   @Column({ name: 'reviewed_at', type: 'datetime', nullable: true })
   reviewedAt!: Date | null;
 
-  /** Approved with "email everyone" ticked — goes into the next daily digest. */
-  @Column({ name: 'notify_by_email', type: 'boolean', default: false })
-  notifyByEmail!: boolean;
+  /** Local day ("YYYY-MM-DD") of the daily question this post answers. */
+  @Index()
+  @Column({ name: 'prompt_day', type: 'char', length: 10, nullable: true })
+  promptDay!: string | null;
 
-  /** When the post went out by email (in a digest); set once, never reset. */
-  @Column({ name: 'notified_at', type: 'datetime', nullable: true })
-  notifiedAt!: Date | null;
+  /** The question itself, kept with the post so it reads right forever. */
+  @Column({ name: 'prompt_text', type: 'varchar', length: 255, nullable: true })
+  promptText!: string | null;
+
+  /** Asked as a question: answers are comments, and the author can accept one. */
+  @Index()
+  @Column({ name: 'is_question', type: 'boolean', default: false })
+  isQuestion!: boolean;
+
+  /** Pinned to the top of everyone's feed by an admin (newest pin first). */
+  @Index()
+  @Column({ name: 'pinned_at', type: 'datetime', nullable: true })
+  pinnedAt!: Date | null;
+
+  /** Set on the celebration post the app writes for a member's milestone. */
+  @Column({ type: 'enum', enum: MilestoneKind, nullable: true })
+  milestone!: MilestoneKind | null;
 
   @OneToMany(() => PostMedia, (media) => media.post)
   media!: Relation<PostMedia>[];

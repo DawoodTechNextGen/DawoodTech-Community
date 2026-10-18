@@ -10,28 +10,40 @@ var __metadata = (this && this.__metadata) || function (k, v) {
 var __param = (this && this.__param) || function (paramIndex, decorator) {
     return function (target, key) { decorator(target, key, paramIndex); }
 };
-import { Body, Controller, Get, Param, Patch, UseGuards } from '@nestjs/common';
+import { Body, Controller, Get, Param, ParseIntPipe, Patch, UseGuards } from '@nestjs/common';
 import { CurrentUser } from '../common/decorators/current-user.decorator.js';
 import { Roles } from '../common/decorators/roles.decorator.js';
 import { RolesGuard } from '../common/guards/roles.guard.js';
 import { UserRole } from '../database/entities/user.entity.js';
-import { ApprovePostDto } from './dto/approve-post.dto.js';
 import { PostsService } from './posts.service.js';
+import { PinPostDto } from './dto/pin-post.dto.js';
 let AdminPostsController = class AdminPostsController {
     posts;
     constructor(posts) {
         this.posts = posts;
     }
+    async stats() {
+        return this.posts.reviewStats();
+    }
     async pending() {
         return this.posts.findPending();
     }
-    async approve(id, admin, dto) {
-        return this.posts.approve(Number(id), admin.id, dto?.notifyInterns ?? true);
+    async approve(id, admin) {
+        return this.posts.approve(id, admin.id);
+    }
+    async pin(id, admin, dto) {
+        return this.posts.setPinned(id, admin.id, dto.pinned, dto.notifyAll);
     }
     async reject(id, admin) {
-        return this.posts.reject(Number(id), admin.id);
+        return this.posts.reject(id, admin.id);
     }
 };
+__decorate([
+    Get('stats'),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", []),
+    __metadata("design:returntype", Promise)
+], AdminPostsController.prototype, "stats", null);
 __decorate([
     Get('pending'),
     __metadata("design:type", Function),
@@ -40,19 +52,27 @@ __decorate([
 ], AdminPostsController.prototype, "pending", null);
 __decorate([
     Patch(':id/approve'),
-    __param(0, Param('id')),
+    __param(0, Param('id', ParseIntPipe)),
     __param(1, CurrentUser()),
-    __param(2, Body()),
     __metadata("design:type", Function),
-    __metadata("design:paramtypes", [String, Object, ApprovePostDto]),
+    __metadata("design:paramtypes", [Number, Object]),
     __metadata("design:returntype", Promise)
 ], AdminPostsController.prototype, "approve", null);
 __decorate([
+    Patch(':id/pin'),
+    __param(0, Param('id', ParseIntPipe)),
+    __param(1, CurrentUser()),
+    __param(2, Body()),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", [Number, Object, PinPostDto]),
+    __metadata("design:returntype", Promise)
+], AdminPostsController.prototype, "pin", null);
+__decorate([
     Patch(':id/reject'),
-    __param(0, Param('id')),
+    __param(0, Param('id', ParseIntPipe)),
     __param(1, CurrentUser()),
     __metadata("design:type", Function),
-    __metadata("design:paramtypes", [String, Object]),
+    __metadata("design:paramtypes", [Number, Object]),
     __metadata("design:returntype", Promise)
 ], AdminPostsController.prototype, "reject", null);
 AdminPostsController = __decorate([

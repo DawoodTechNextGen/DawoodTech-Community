@@ -1,6 +1,7 @@
 import { ConfigService } from '@nestjs/config';
 import { Strategy } from 'passport-jwt';
-import { UserRole } from '../database/entities/user.entity.js';
+import { Repository } from 'typeorm';
+import { User, UserRole } from '../database/entities/user.entity.js';
 export interface JwtPayload {
     sub: number;
     role: UserRole;
@@ -13,7 +14,8 @@ declare const JwtStrategy_base: new (...args: [opt: import("passport-jwt").Strat
     validate(...args: any[]): unknown;
 };
 export declare class JwtStrategy extends JwtStrategy_base {
-    constructor(config: ConfigService);
-    validate(payload: JwtPayload): AuthenticatedUser;
+    private readonly users;
+    constructor(config: ConfigService, users: Repository<User>);
+    validate(payload: JwtPayload): Promise<AuthenticatedUser>;
 }
 export {};

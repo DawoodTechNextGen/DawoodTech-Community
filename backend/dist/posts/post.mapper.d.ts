@@ -12,5 +12,12 @@ export interface PostResponse {
     likeCount: number;
     commentCount: number;
     likedByMe: boolean;
+    reactions: Record<string, number>;
+    myReaction: string | null;
+    prompt: string | null;
+    milestone: string | null;
+    pinned: boolean;
+    isQuestion: boolean;
+    answered: boolean;
 }
 export declare function toPostResponse(post: Post, viewerId?: number): PostResponse;

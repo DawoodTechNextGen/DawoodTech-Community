@@ -6,6 +6,6 @@ export declare class AdminUsersController {
     private readonly users;
     constructor(users: UsersService);
     findAll(): Promise<import("./user.mapper.js").AdminUserResponse[]>;
-    setStatus(id: string, dto: UpdateUserStatusDto, admin: AuthenticatedUser): Promise<import("./user.mapper.js").AdminUserResponse>;
-    setRole(id: string, dto: UpdateUserRoleDto, admin: AuthenticatedUser): Promise<import("./user.mapper.js").AdminUserResponse>;
+    setStatus(id: number, dto: UpdateUserStatusDto, admin: AuthenticatedUser): Promise<import("./user.mapper.js").AdminUserResponse>;
+    setRole(id: number, dto: UpdateUserRoleDto, admin: AuthenticatedUser): Promise<import("./user.mapper.js").AdminUserResponse>;
 }

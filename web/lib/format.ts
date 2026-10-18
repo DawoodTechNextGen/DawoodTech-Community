@@ -16,3 +16,11 @@ export function formatRelativeTime(iso: string): string {
     year: "numeric",
   });
 }
+
+/** Minutes as "45 min", "3h 20m" or "2d 4h". */
+export function formatWait(minutes: number): string {
+  if (minutes < 60) return `${minutes} min`;
+  const hours = Math.floor(minutes / 60);
+  if (hours < 24) return `${hours}h ${minutes % 60}m`;
+  return `${Math.floor(hours / 24)}d ${hours % 24}h`;
+}

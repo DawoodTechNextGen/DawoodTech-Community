@@ -10,7 +10,7 @@ var __metadata = (this && this.__metadata) || function (k, v) {
 var __param = (this && this.__param) || function (paramIndex, decorator) {
     return function (target, key) { decorator(target, key, paramIndex); }
 };
-import { Controller, Get, HttpCode, HttpStatus, Param, Patch, Query } from '@nestjs/common';
+import { Controller, Get, HttpCode, HttpStatus, Param, ParseIntPipe, Patch, Query, } from '@nestjs/common';
 import { CurrentUser } from '../common/decorators/current-user.decorator.js';
 import { NotificationsService } from './notifications.service.js';
 let NotificationsController = class NotificationsController {
@@ -26,7 +26,7 @@ let NotificationsController = class NotificationsController {
         return { count };
     }
     async markRead(id, user) {
-        await this.notifications.markRead(Number(id), user.id);
+        await this.notifications.markRead(id, user.id);
         return { success: true };
     }
     async markAllRead(user) {
@@ -52,10 +52,10 @@ __decorate([
 __decorate([
     Patch(':id/read'),
     HttpCode(HttpStatus.OK),
-    __param(0, Param('id')),
+    __param(0, Param('id', ParseIntPipe)),
     __param(1, CurrentUser()),
     __metadata("design:type", Function),
-    __metadata("design:paramtypes", [String, Object]),
+    __metadata("design:paramtypes", [Number, Object]),
     __metadata("design:returntype", Promise)
 ], NotificationsController.prototype, "markRead", null);
 __decorate([

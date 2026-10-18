@@ -6,11 +6,7 @@ import { Brackets, DataSource, Repository } from 'typeorm';
 import { User, UserStatus } from '../database/entities/user.entity.js';
 import { MailService } from '../mail/mail.service.js';
 import { verifyEmailTemplate } from '../mail/templates.js';
-import {
-  errorMessage,
-  hourlyAllowance,
-  withAdvisoryLock,
-} from '../post-emails/email-worker-utils.js';
+import { errorMessage, hourlyAllowance, withAdvisoryLock } from '../mail/mail-utils.js';
 
 const TOKEN_EXPIRES_IN = '1h';
 const MAX_ATTEMPTS = 3;
@@ -93,7 +89,7 @@ export class VerificationEmailsService {
         const total = await query.getCount();
         const allowance = await hourlyAllowance(
           this.dataSource,
-          this.config.get<number>('postEmails.hourlyLimit') ?? 20,
+          this.config.get<number>('emailHourlyLimit') ?? 20,
         );
         const batch = allowance > 0 ? await query.take(allowance).getMany() : [];
 
