@@ -1,18 +1,28 @@
 import { ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import { InjectRepository } from '@nestjs/typeorm';
-import { IsNull, Repository } from 'typeorm';
+import { In, IsNull, MoreThan, Not, Repository, type SelectQueryBuilder } from 'typeorm';
 import { CommentsService } from '../comments/comments.service.js';
 import { FollowsService } from '../follows/follows.service.js';
 import { LikesService } from '../likes/likes.service.js';
 import { PostMedia } from '../database/entities/post-media.entity.js';
+import { PostTag } from '../database/entities/post-tag.entity.js';
+import { extractHashtags } from '../common/hashtags.js';
 import { Post, PostStatus } from '../database/entities/post.entity.js';
+import { User, UserRole } from '../database/entities/user.entity.js';
+import type { AuthenticatedUser } from '../auth/jwt.strategy.js';
 import { NotificationEvents } from '../notifications/notification.events.js';
 import type { CreatePostDto } from './dto/create-post.dto.js';
 import type { UpdatePostDto } from './dto/update-post.dto.js';
 import { toPostResponse, type PostResponse } from './post.mapper.js';
+import { sameId } from '../common/same-id.js';
+import { promptForDay } from '../prompts/daily-prompts.js';
+import { localDay } from '../prompts/local-day.js';
 
 const PAGE_SIZE = 20;
+/** Announcements pinned above the feed at once. */
+const MAX_PINNED = 3;
 
 @Injectable()
 export class PostsService {
@@ -20,20 +30,94 @@ export class PostsService {
     @InjectRepository(Post) private readonly posts: Repository<Post>,
     @InjectRepository(PostMedia)
     private readonly postMedia: Repository<PostMedia>,
+    @InjectRepository(PostTag) private readonly postTags: Repository<PostTag>,
     private readonly followsService: FollowsService,
     private readonly likesService: LikesService,
     private readonly commentsService: CommentsService,
     private readonly events: EventEmitter2,
+    @InjectRepository(User) private readonly users: Repository<User>,
+    private readonly config: ConfigService,
   ) {}
 
+  /**
+   * Members who have earned trust skip the review queue: staff (admins and
+   * supervisors) always, and members with AUTO_APPROVE_AFTER approved posts
+   * and no rejection in the last 30 days. Waiting hours for approval is the
+   * quickest way to make people stop posting.
+   */
+  private async isTrusted(userId: number): Promise<boolean> {
+    const user = await this.users.findOne({
+      where: { id: userId },
+      select: { id: true, role: true },
+    });
+    if (!user) return false;
+    if (user.role === UserRole.ADMIN || user.role === UserRole.SUPERVISOR) return true;
+
+    const threshold = this.config.get<number>('autoApproveAfter') ?? 3;
+    if (threshold <= 0) return false;
+    const since = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
+    const [approved, recentlyRejected] = await Promise.all([
+      this.posts.countBy({ userId, status: PostStatus.APPROVED }),
+      this.posts.countBy({
+        userId,
+        status: PostStatus.REJECTED,
+        reviewedAt: MoreThan(since),
+      }),
+    ]);
+    return approved >= threshold && recentlyRejected === 0;
+  }
+
+  /** Approved straight away for trusted members, otherwise queued for review. */
+  private async initialReview(
+    userId: number,
+  ): Promise<Pick<Post, 'status' | 'reviewedBy' | 'reviewedAt'>> {
+    return (await this.isTrusted(userId))
+      ? {
+          status: PostStatus.APPROVED,
+          reviewedBy: null,
+          reviewedAt: new Date(),
+        }
+      : { status: PostStatus.PENDING, reviewedBy: null, reviewedAt: null };
+  }
+
+  /** Live posts notify anyone they @mention (pending ones wait for approval). */
+  private announceMentions(post: Post): void {
+    if (post.status !== PostStatus.APPROVED) return;
+    this.events.emit(NotificationEvents.MentionsPublished, {
+      postId: post.id,
+      actorId: post.userId,
+      text: post.content,
+      skipUserIds: [],
+    });
+  }
+
+  /** After a post is saved: mentions if it's live, review alerts if it's queued. */
+  private announce(post: Post): void {
+    this.announceMentions(post);
+    if (post.status !== PostStatus.PENDING) return;
+    this.events.emit(NotificationEvents.PendingPostsChanged);
+    this.events.emit(NotificationEvents.PostSubmitted, {
+      postId: post.id,
+      authorId: post.userId,
+    });
+  }
+
   async create(userId: number, dto: CreatePostDto): Promise<PostResponse> {
+    const promptDay = dto.answersPrompt
+      ? localDay(new Date(), this.config.get<string>('timeZone') ?? 'Asia/Karachi')
+      : null;
     const post = await this.posts.save(
       this.posts.create({
         userId,
         content: dto.content,
-        status: PostStatus.PENDING,
+        promptDay,
+        promptText: promptDay ? promptForDay(promptDay) : null,
+        isQuestion: dto.isQuestion ?? false,
+        ...(await this.initialReview(userId)),
       }),
     );
+
+    await this.saveTags(post);
 
     if (dto.mediaUrls?.length) {
       await this.postMedia.save(
@@ -43,6 +127,7 @@ export class PostsService {
       );
     }
 
+    this.announce(post);
     return this.getByIdOrFail(post.id, userId);
   }
 
@@ -60,6 +145,8 @@ export class PostsService {
       .leftJoinAndSelect('post.author', 'author')
       .leftJoinAndSelect('post.media', 'media')
       .where('post.status = :status', { status: PostStatus.APPROVED })
+      // Pinned posts sit in their own section above the feed.
+      .andWhere('post.pinnedAt IS NULL')
       .andWhere('post.userId IN (:...authorIds)', { authorIds })
       .orderBy('post.createdAt', 'DESC')
       .take(PAGE_SIZE);
@@ -69,6 +156,9 @@ export class PostsService {
     }
 
     const posts = await qb.getMany();
+    // People you follow haven't posted anything yet: show the whole community
+    // rather than an empty page.
+    if (!cursor && posts.length === 0) return this.findExplore(cursor, viewerId);
     const items = await this.attachEngagement(
       posts.map((p) => toPostResponse(p, viewerId)),
       viewerId,
@@ -76,26 +166,76 @@ export class PostsService {
     return {
       items,
       nextCursor:
-        posts.length === PAGE_SIZE
-          ? posts[posts.length - 1]!.createdAt.toISOString()
-          : null,
+        posts.length === PAGE_SIZE ? posts[posts.length - 1]!.createdAt.toISOString() : null,
     };
   }
 
   async findExplore(cursor?: string, viewerId?: number) {
-    const qb = this.posts
+    // Pinned posts sit in their own section above the feed.
+    return this.page(this.approvedPosts().andWhere('post.pinnedAt IS NULL'), cursor, viewerId);
+  }
+
+  /** Questions, newest first — the "Questions" tab. */
+  async findQuestions(cursor?: string, viewerId?: number) {
+    return this.page(this.approvedPosts().andWhere('post.isQuestion = 1'), cursor, viewerId);
+  }
+
+  /** Posts carrying #tag. */
+  async findByTag(tag: string, cursor?: string, viewerId?: number) {
+    const qb = this.approvedPosts().innerJoin(
+      PostTag,
+      'pt',
+      'pt.post_id = post.id AND pt.tag = :tag',
+      {
+        tag: tag.toLowerCase(),
+      },
+    );
+    return this.page(qb, cursor, viewerId);
+  }
+
+  /** Text search over published posts. */
+  async search(query: string, viewerId?: number): Promise<PostResponse[]> {
+    const escaped = query.replace(/[\\%_]/g, (c) => `\\${c}`);
+    const posts = await this.approvedPosts()
+      .andWhere('post.content LIKE :q', { q: `%${escaped}%` })
+      .take(PAGE_SIZE)
+      .getMany();
+    return this.attachEngagement(
+      posts.map((p) => toPostResponse(p, viewerId)),
+      viewerId,
+    );
+  }
+
+  /** Most-used tags on posts from the last week. */
+  async trendingTags(days = 7, limit = 10): Promise<{ tag: string; count: number }[]> {
+    const rows = await this.postTags
+      .createQueryBuilder('pt')
+      .innerJoin(Post, 'post', 'post.id = pt.post_id')
+      .select('pt.tag', 'tag')
+      .addSelect('COUNT(*)', 'count')
+      .where('post.status = :status', { status: PostStatus.APPROVED })
+      .andWhere('post.createdAt >= :since', { since: new Date(Date.now() - days * 86_400_000) })
+      .groupBy('pt.tag')
+      .orderBy('count', 'DESC')
+      .addOrderBy('pt.tag', 'ASC')
+      .limit(limit)
+      .getRawMany<{ tag: string; count: string }>();
+    return rows.map((r) => ({ tag: r.tag, count: Number(r.count) }));
+  }
+
+  private approvedPosts() {
+    return this.posts
       .createQueryBuilder('post')
       .leftJoinAndSelect('post.author', 'author')
       .leftJoinAndSelect('post.media', 'media')
       .where('post.status = :status', { status: PostStatus.APPROVED })
-      .orderBy('post.createdAt', 'DESC')
-      .take(PAGE_SIZE);
+      .orderBy('post.createdAt', 'DESC');
+  }
 
-    if (cursor) {
-      qb.andWhere('post.createdAt < :cursor', { cursor: new Date(cursor) });
-    }
-
-    const posts = await qb.getMany();
+  /** One cursor page (by createdAt) of a post query. */
+  private async page(qb: SelectQueryBuilder<Post>, cursor: string | undefined, viewerId?: number) {
+    if (cursor) qb.andWhere('post.createdAt < :cursor', { cursor: new Date(cursor) });
+    const posts = await qb.take(PAGE_SIZE).getMany();
     const items = await this.attachEngagement(
       posts.map((p) => toPostResponse(p, viewerId)),
       viewerId,
@@ -103,10 +243,17 @@ export class PostsService {
     return {
       items,
       nextCursor:
-        posts.length === PAGE_SIZE
-          ? posts[posts.length - 1]!.createdAt.toISOString()
-          : null,
+        posts.length === PAGE_SIZE ? posts[posts.length - 1]!.createdAt.toISOString() : null,
     };
+  }
+
+  /** Keeps post_tags in step with the post's #hashtags. */
+  private async saveTags(post: Post): Promise<void> {
+    await this.postTags.delete({ postId: post.id });
+    const tags = extractHashtags(post.content);
+    if (tags.length) {
+      await this.postTags.insert(tags.map((tag) => ({ postId: post.id, tag })));
+    }
   }
 
   async findByUser(userId: number, viewerId?: number): Promise<PostResponse[]> {
@@ -117,7 +264,7 @@ export class PostsService {
       .where('post.userId = :userId', { userId })
       .orderBy('post.createdAt', 'DESC');
 
-    if (viewerId !== userId) {
+    if (!sameId(viewerId, userId)) {
       qb.andWhere('post.status = :status', { status: PostStatus.APPROVED });
     }
 
@@ -128,13 +275,18 @@ export class PostsService {
     );
   }
 
+  /** Every post the member wrote, whatever its review status. */
+  countByUser(userId: number): Promise<number> {
+    return this.posts.countBy({ userId });
+  }
+
   async getByIdOrFail(id: number, viewerId?: number): Promise<PostResponse> {
     const post = await this.posts.findOne({
       where: { id },
       relations: { author: true, media: true },
     });
     if (!post) throw new NotFoundException('Post not found');
-    if (post.status !== PostStatus.APPROVED && post.userId !== viewerId) {
+    if (post.status !== PostStatus.APPROVED && !sameId(post.userId, viewerId)) {
       throw new NotFoundException('Post not found');
     }
     const [withEngagement] = await this.attachEngagement(
@@ -149,15 +301,14 @@ export class PostsService {
   async updateOwn(id: number, userId: number, dto: UpdatePostDto): Promise<PostResponse> {
     const post = await this.posts.findOneBy({ id });
     if (!post) throw new NotFoundException('Post not found');
-    if (post.userId !== userId) {
+    if (!sameId(post.userId, userId)) {
       throw new ForbiddenException('You can only edit your own posts');
     }
 
     post.content = dto.content;
-    post.status = PostStatus.PENDING;
-    post.reviewedBy = null;
-    post.reviewedAt = null;
+    Object.assign(post, await this.initialReview(userId));
     await this.posts.save(post);
+    await this.saveTags(post);
 
     if (dto.mediaUrls) {
       await this.postMedia.delete({ postId: id });
@@ -170,19 +321,89 @@ export class PostsService {
       }
     }
 
+    this.announce(post);
     return this.getByIdOrFail(id, userId);
   }
 
-  async deleteOwn(id: number, userId: number): Promise<void> {
+  /** Authors delete their own posts; admins can remove any post. */
+  async delete(id: number, actor: AuthenticatedUser): Promise<void> {
     const post = await this.posts.findOneBy({ id });
     if (!post) throw new NotFoundException('Post not found');
-    if (post.userId !== userId) {
+    if (!sameId(post.userId, actor.id) && actor.role !== UserRole.ADMIN) {
       throw new ForbiddenException('You can only delete your own posts');
     }
+    const wasPending = post.status === PostStatus.PENDING;
     await this.posts.remove(post);
+    if (wasPending) this.events.emit(NotificationEvents.PendingPostsChanged);
   }
 
   // --- Admin moderation ---
+
+  /** Review-queue health for the admin page: how long members wait. */
+  async reviewStats(): Promise<{
+    pending: number;
+    avgWaitMinutes: number | null;
+    reviewed30d: number;
+  }> {
+    const since = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
+    const [pending, row] = await Promise.all([
+      this.posts.countBy({ status: PostStatus.PENDING }),
+      this.posts
+        .createQueryBuilder('post')
+        .select('AVG(TIMESTAMPDIFF(MINUTE, post.createdAt, post.reviewedAt))', 'avg')
+        .addSelect('COUNT(*)', 'count')
+        // reviewedBy set = a person reviewed it (auto-approvals have none).
+        .where('post.reviewedBy IS NOT NULL')
+        .andWhere('post.reviewedAt > :since', { since })
+        .getRawOne<{ avg: string | null; count: string }>(),
+    ]);
+    return {
+      pending,
+      avgWaitMinutes: row?.avg == null ? null : Math.round(Number(row.avg)),
+      reviewed30d: Number(row?.count ?? 0),
+    };
+  }
+
+  /** Admin announcements pinned above everyone's feed, newest pin first. */
+  async findPinned(viewerId?: number): Promise<PostResponse[]> {
+    const posts = await this.posts.find({
+      where: { status: PostStatus.APPROVED, pinnedAt: Not(IsNull()) },
+      relations: { author: true, media: true },
+      order: { pinnedAt: 'DESC' },
+      take: MAX_PINNED,
+    });
+    return this.attachEngagement(
+      posts.map((p) => toPostResponse(p, viewerId)),
+      viewerId,
+    );
+  }
+
+  /** Pins (or unpins) a live post. Pinning a fourth unpins the oldest; with
+   *  `notifyAll` every member gets an announcement notification. */
+  async setPinned(
+    id: number,
+    adminId: number,
+    pinned: boolean,
+    notifyAll = false,
+  ): Promise<PostResponse> {
+    const post = await this.posts.findOneBy({ id });
+    if (!post || post.status !== PostStatus.APPROVED) throw new NotFoundException('Post not found');
+
+    if (pinned) {
+      const current = await this.posts.find({
+        select: { id: true },
+        where: { pinnedAt: Not(IsNull()), id: Not(id) },
+        order: { pinnedAt: 'DESC' },
+      });
+      const unpin = current.slice(MAX_PINNED - 1).map((p) => p.id);
+      if (unpin.length) await this.posts.update({ id: In(unpin) }, { pinnedAt: null });
+    }
+    await this.posts.update({ id }, { pinnedAt: pinned ? new Date() : null });
+    if (pinned && notifyAll) {
+      this.events.emit(NotificationEvents.AnnouncementPinned, { postId: id, adminId });
+    }
+    return this.getByIdOrFail(id, adminId);
+  }
 
   async findPending(): Promise<PostResponse[]> {
     const posts = await this.posts.find({
@@ -193,13 +414,8 @@ export class PostsService {
     return posts.map((p) => toPostResponse(p));
   }
 
-  async approve(id: number, adminId: number, notifyInterns = true): Promise<PostResponse> {
-    const response = await this.review(id, adminId, PostStatus.APPROVED);
-    // Emails go out in the next daily digest (see DigestEmailsService). A post
-    // that was already emailed keeps notified_at, so re-approving it after an
-    // edit never sends it again.
-    await this.posts.update({ id, notifiedAt: IsNull() }, { notifyByEmail: notifyInterns });
-    return response;
+  async approve(id: number, adminId: number): Promise<PostResponse> {
+    return this.review(id, adminId, PostStatus.APPROVED);
   }
 
   async reject(id: number, adminId: number): Promise<PostResponse> {
@@ -228,6 +444,8 @@ export class PostsService {
         : NotificationEvents.PostRejected,
       { postId: post.id, authorId: post.userId, adminId },
     );
+    this.announceMentions(post);
+    this.events.emit(NotificationEvents.PendingPostsChanged);
 
     return toPostResponse(post, post.userId);
   }
@@ -239,24 +457,35 @@ export class PostsService {
     if (items.length === 0) return items;
     const postIds = items.map((i) => Number(i.id));
 
-    const [likeCounts, commentCounts, likedIds] = await Promise.all([
+    const [reactionCounts, commentCounts, myReactions, answered] = await Promise.all([
       this.likesService.countsByPostIds(postIds),
       this.commentsService.countsByPostIds(postIds),
       viewerId
-        ? this.likesService.likedPostIdsByUser(viewerId, postIds)
-        : Promise.resolve(new Set<number>()),
+        ? this.likesService.reactionsByUser(viewerId, postIds)
+        : Promise.resolve(new Map<number, string>()),
+      this.commentsService.postIdsWithAcceptedAnswer(postIds),
     ]);
 
-    const likeMap = new Map(likeCounts.map((r) => [Number(r.postId), Number(r.count)]));
-    const commentMap = new Map(
-      commentCounts.map((r) => [Number(r.postId), Number(r.count)]),
-    );
+    const reactionMap = new Map<number, Record<string, number>>();
+    for (const row of reactionCounts) {
+      const counts = reactionMap.get(Number(row.postId)) ?? {};
+      counts[row.reaction] = Number(row.count);
+      reactionMap.set(Number(row.postId), counts);
+    }
+    const commentMap = new Map(commentCounts.map((r) => [Number(r.postId), Number(r.count)]));
 
-    return items.map((item) => ({
-      ...item,
-      likeCount: likeMap.get(Number(item.id)) ?? 0,
-      commentCount: commentMap.get(Number(item.id)) ?? 0,
-      likedByMe: likedIds.has(Number(item.id)),
-    }));
+    return items.map((item) => {
+      const reactions = reactionMap.get(Number(item.id)) ?? {};
+      const myReaction = myReactions.get(Number(item.id)) ?? null;
+      return {
+        ...item,
+        likeCount: Object.values(reactions).reduce((sum, n) => sum + n, 0),
+        commentCount: commentMap.get(Number(item.id)) ?? 0,
+        likedByMe: myReaction !== null,
+        reactions,
+        myReaction,
+        answered: answered.has(Number(item.id)),
+      };
+    });
   }
 }

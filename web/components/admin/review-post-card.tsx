@@ -14,16 +14,15 @@ export function ReviewPostCard({
   onReject,
 }: {
   post: Post;
-  onApprove: (post: Post, notifyInterns: boolean) => Promise<void>;
+  onApprove: (post: Post) => Promise<void>;
   onReject: (post: Post) => Promise<void>;
 }) {
   const [pending, setPending] = useState<"approve" | "reject" | null>(null);
-  const [notifyInterns, setNotifyInterns] = useState(true);
 
   async function handle(action: "approve" | "reject") {
     setPending(action);
     try {
-      await (action === "approve" ? onApprove(post, notifyInterns) : onReject(post));
+      await (action === "approve" ? onApprove(post) : onReject(post));
     } finally {
       setPending(null);
     }
@@ -63,18 +62,7 @@ export function ReviewPostCard({
             </div>
           )}
 
-          <label className="mt-4 flex w-fit cursor-pointer items-center gap-2 text-sm text-foreground/70">
-            <input
-              type="checkbox"
-              checked={notifyInterns}
-              disabled={pending !== null}
-              onChange={(e) => setNotifyInterns(e.target.checked)}
-              className="h-4 w-4 accent-brand"
-            />
-            Include in the daily email digest
-          </label>
-
-          <div className="mt-3 flex items-center gap-2">
+          <div className="mt-4 flex items-center gap-2">
             <button
               type="button"
               disabled={pending !== null}

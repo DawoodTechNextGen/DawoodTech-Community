@@ -1,7 +1,6 @@
 export function toPublicUser(user) {
     return {
         id: user.id,
-        email: user.email,
         username: user.username,
         fullName: user.fullName,
         bio: user.bio,
@@ -9,9 +8,12 @@ export function toPublicUser(user) {
         role: user.role,
     };
 }
+export function toSelfUser(user) {
+    return { ...toPublicUser(user), email: user.email };
+}
 export function toAdminUserResponse(user) {
     return {
-        ...toPublicUser(user),
+        ...toSelfUser(user),
         status: user.status,
         createdAt: user.createdAt.toISOString(),
     };

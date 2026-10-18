@@ -7,7 +7,9 @@ declare const _default: () => {
         username: string;
         password: string;
         database: string;
+        synchronize: boolean;
     };
+    trustProxy: number;
     jwt: {
         accessSecret: string;
         accessExpiresIn: string;
@@ -17,8 +19,6 @@ declare const _default: () => {
     };
     corsOrigins: string[];
     frontendUrl: string;
-    communityUrl: string;
-    apiPublicUrl: string;
     smtp: {
         host: string;
         port: number;
@@ -30,24 +30,13 @@ declare const _default: () => {
             address: string;
         };
     };
-    taskdeskDb: {
-        host: string;
-        port: number;
-        user: string;
-        password: string;
-        database: string;
-        recentMonths: number;
-    };
-    postEmails: {
-        mode: "live" | "test" | "dry_run";
-        testRecipient: string;
-        batchSize: number;
-        delayMs: number;
-        maxAttempts: number;
-        hourlyLimit: number;
-        digestHour: number;
-        digestTimeZone: string;
-        activityMode: "live" | "test" | "dry_run";
+    timeZone: string;
+    autoApproveAfter: number;
+    emailHourlyLimit: number;
+    push: {
+        publicKey: string;
+        privateKey: string;
+        subject: string;
     };
 };
 export default _default;

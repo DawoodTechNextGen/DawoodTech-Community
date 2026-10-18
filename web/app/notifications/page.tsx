@@ -4,14 +4,17 @@ import { BellOff, CheckCheck } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
 import { AppShell } from "@/components/layout/app-shell";
 import { NotificationItem } from "@/components/notifications/notification-item";
+import { PushToggle } from "@/components/notifications/push-prompt";
 import { Button } from "@/components/ui/button";
 import { ErrorBanner } from "@/components/ui/error-banner";
 import { api } from "@/lib/api-client";
+import { useNotifications } from "@/lib/notifications-context";
 import type { Notification } from "@/lib/types";
 import { useRequireAuth } from "@/lib/use-require-auth";
 
 export default function NotificationsPage() {
   const { user, isLoading: authLoading } = useRequireAuth();
+  const { onNotification } = useNotifications();
 
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [cursor, setCursor] = useState<string | null>(null);
@@ -37,6 +40,17 @@ export default function NotificationsPage() {
   useEffect(() => {
     if (user) load();
   }, [user, load]);
+
+  // New notifications slide in at the top as they arrive.
+  useEffect(
+    () =>
+      onNotification((incoming) => {
+        setNotifications((prev) =>
+          prev.some((n) => n.id === incoming.id) ? prev : [incoming, ...prev],
+        );
+      }),
+    [onNotification],
+  );
 
   async function loadMore() {
     if (!cursor) return;
@@ -81,12 +95,15 @@ export default function NotificationsPage() {
       <div>
         <div className="mb-4 flex items-center justify-between">
           <h1 className="text-lg font-semibold">Notifications</h1>
-          {hasUnread && (
-            <Button variant="ghost" loading={markingAll} onClick={handleMarkAllRead}>
-              <CheckCheck className="h-4 w-4" />
-              Mark all read
-            </Button>
-          )}
+          <div className="flex items-center gap-1">
+            <PushToggle />
+            {hasUnread && (
+              <Button variant="ghost" loading={markingAll} onClick={handleMarkAllRead}>
+                <CheckCheck className="h-4 w-4" />
+                Mark all read
+              </Button>
+            )}
+          </div>
         </div>
 
         {error && (

@@ -10,7 +10,7 @@ var __metadata = (this && this.__metadata) || function (k, v) {
 var __param = (this && this.__param) || function (paramIndex, decorator) {
     return function (target, key) { decorator(target, key, paramIndex); }
 };
-import { Body, Controller, Get, Param, Patch, UseGuards } from '@nestjs/common';
+import { Body, Controller, Get, Param, ParseIntPipe, Patch, UseGuards } from '@nestjs/common';
 import { CurrentUser } from '../common/decorators/current-user.decorator.js';
 import { Roles } from '../common/decorators/roles.decorator.js';
 import { RolesGuard } from '../common/guards/roles.guard.js';
@@ -29,11 +29,11 @@ let AdminUsersController = class AdminUsersController {
         return users.map(toAdminUserResponse);
     }
     async setStatus(id, dto, admin) {
-        const user = await this.users.setStatus(Number(id), dto.status, admin.id);
+        const user = await this.users.setStatus(id, dto.status, admin.id);
         return toAdminUserResponse(user);
     }
     async setRole(id, dto, admin) {
-        const user = await this.users.setRole(Number(id), dto.role, admin.id);
+        const user = await this.users.setRole(id, dto.role, admin.id);
         return toAdminUserResponse(user);
     }
 };
@@ -45,20 +45,20 @@ __decorate([
 ], AdminUsersController.prototype, "findAll", null);
 __decorate([
     Patch(':id/status'),
-    __param(0, Param('id')),
+    __param(0, Param('id', ParseIntPipe)),
     __param(1, Body()),
     __param(2, CurrentUser()),
     __metadata("design:type", Function),
-    __metadata("design:paramtypes", [String, UpdateUserStatusDto, Object]),
+    __metadata("design:paramtypes", [Number, UpdateUserStatusDto, Object]),
     __metadata("design:returntype", Promise)
 ], AdminUsersController.prototype, "setStatus", null);
 __decorate([
     Patch(':id/role'),
-    __param(0, Param('id')),
+    __param(0, Param('id', ParseIntPipe)),
     __param(1, Body()),
     __param(2, CurrentUser()),
     __metadata("design:type", Function),
-    __metadata("design:paramtypes", [String, UpdateUserRoleDto, Object]),
+    __metadata("design:paramtypes", [Number, UpdateUserRoleDto, Object]),
     __metadata("design:returntype", Promise)
 ], AdminUsersController.prototype, "setRole", null);
 AdminUsersController = __decorate([

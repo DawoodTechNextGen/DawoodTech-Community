@@ -5,7 +5,13 @@ export declare const NotificationEvents: {
     readonly LikeCreated: "like.created";
     readonly PostApproved: "post.approved";
     readonly PostRejected: "post.rejected";
-    readonly CommentPosted: "comment.posted";
+    readonly PendingPostsChanged: "posts.pending-changed";
+    readonly MentionsPublished: "mentions.published";
+    readonly AnnouncementPinned: "announcement.pinned";
+    readonly AnswerAccepted: "answer.accepted";
+    readonly PostSubmitted: "post.submitted";
+    readonly UserVerified: "user.verified";
+    readonly UserAccessChanged: "user.access-changed";
 };
 export interface CommentCreatedEvent {
     postId: number;
@@ -31,10 +37,28 @@ export interface PostReviewedEvent {
     authorId: number;
     adminId: number;
 }
-export interface CommentPostedEvent {
+export interface UserAccessChangedEvent {
+    userId: number;
+}
+export interface PostSubmittedEvent {
     postId: number;
-    commentId: number;
-    postOwnerId: number;
-    parentCommentAuthorId: number | null;
+    authorId: number;
+}
+export interface UserVerifiedEvent {
+    userId: number;
+}
+export interface MentionsPublishedEvent {
+    postId: number;
+    actorId: number;
+    text: string;
+    skipUserIds: number[];
+}
+export interface AnnouncementPinnedEvent {
+    postId: number;
+    adminId: number;
+}
+export interface AnswerAcceptedEvent {
+    postId: number;
+    answerAuthorId: number;
     actorId: number;
 }

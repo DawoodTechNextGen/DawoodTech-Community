@@ -1,3 +1,17 @@
+const DEV_SECRETS = {
+    JWT_ACCESS_SECRET: 'dev-access-secret',
+    JWT_REFRESH_SECRET: 'dev-refresh-secret',
+    JWT_EMAIL_TOKEN_SECRET: 'dev-email-token-secret',
+};
+function secret(name) {
+    const value = process.env[name];
+    if (value && !value.startsWith('change-me'))
+        return value;
+    if (process.env.NODE_ENV === 'development' || process.env.NODE_ENV === 'test') {
+        return value || DEV_SECRETS[name];
+    }
+    throw new Error(`${name} must be set to a long random value in .env`);
+}
 export default () => ({
     nodeEnv: process.env.NODE_ENV ?? 'development',
     port: parseInt(process.env.PORT ?? '3000', 10),
@@ -7,22 +21,20 @@ export default () => ({
         username: process.env.DB_USERNAME ?? 'root',
         password: process.env.DB_PASSWORD ?? '',
         database: process.env.DB_DATABASE ?? 'dawoodtech_community',
+        synchronize: process.env.DB_SYNCHRONIZE === 'true',
     },
+    trustProxy: parseInt(process.env.TRUST_PROXY ?? '1', 10),
     jwt: {
-        accessSecret: process.env.JWT_ACCESS_SECRET ?? 'dev-access-secret',
+        accessSecret: secret('JWT_ACCESS_SECRET'),
         accessExpiresIn: process.env.JWT_ACCESS_EXPIRES_IN ?? '15m',
-        refreshSecret: process.env.JWT_REFRESH_SECRET ?? 'dev-refresh-secret',
+        refreshSecret: secret('JWT_REFRESH_SECRET'),
         refreshExpiresIn: process.env.JWT_REFRESH_EXPIRES_IN ?? '30d',
-        emailTokenSecret: process.env.JWT_EMAIL_TOKEN_SECRET ?? 'dev-email-token-secret',
+        emailTokenSecret: secret('JWT_EMAIL_TOKEN_SECRET'),
     },
     corsOrigins: (process.env.CORS_ORIGINS ?? 'http://localhost:5173')
         .split(',')
         .map((origin) => origin.trim()),
     frontendUrl: process.env.FRONTEND_URL ?? 'http://localhost:3001',
-    communityUrl: (process.env.COMMUNITY_URL ||
-        process.env.FRONTEND_URL ||
-        'http://localhost:3001').replace(/\/+$/, ''),
-    apiPublicUrl: (process.env.API_PUBLIC_URL || 'http://localhost:3000').replace(/\/+$/, ''),
     smtp: {
         host: process.env.MAIL_HOST || process.env.SMTP_HOST || '',
         port: parseInt(process.env.MAIL_PORT || process.env.SMTP_PORT || '587', 10),
@@ -38,26 +50,13 @@ export default () => ({
             }
             : (process.env.MAIL_FROM ?? 'DawoodTech Community <no-reply@dawoodtechnextgen.com>'),
     },
-    taskdeskDb: {
-        host: process.env.TASKDESK_DB_HOST || process.env.DB_HOST || '127.0.0.1',
-        port: parseInt(process.env.TASKDESK_DB_PORT || process.env.DB_PORT || '3306', 10),
-        user: process.env.TASKDESK_DB_USER ?? '',
-        password: process.env.TASKDESK_DB_PASS ?? '',
-        database: process.env.TASKDESK_DB_NAME || 'task_management',
-        recentMonths: parseInt(process.env.TASKDESK_RECENT_MONTHS ?? '3', 10),
-    },
-    postEmails: {
-        mode: (process.env.POST_EMAIL_MODE ?? 'dry_run'),
-        testRecipient: process.env.POST_EMAIL_TEST_RECIPIENT ?? '',
-        batchSize: parseInt(process.env.POST_EMAIL_BATCH_SIZE ?? '50', 10),
-        delayMs: parseInt(process.env.POST_EMAIL_DELAY_MS ?? '1000', 10),
-        maxAttempts: 3,
-        hourlyLimit: parseInt(process.env.EMAIL_HOURLY_LIMIT ?? '20', 10),
-        digestHour: parseInt(process.env.DIGEST_HOUR ?? '9', 10),
-        digestTimeZone: process.env.DIGEST_TIMEZONE || 'Asia/Karachi',
-        activityMode: (process.env.ACTIVITY_EMAIL_MODE ??
-            process.env.POST_EMAIL_MODE ??
-            'dry_run'),
+    timeZone: process.env.APP_TIMEZONE || 'Asia/Karachi',
+    autoApproveAfter: parseInt(process.env.AUTO_APPROVE_AFTER ?? '3', 10),
+    emailHourlyLimit: parseInt(process.env.EMAIL_HOURLY_LIMIT ?? '20', 10),
+    push: {
+        publicKey: process.env.VAPID_PUBLIC_KEY ?? '',
+        privateKey: process.env.VAPID_PRIVATE_KEY ?? '',
+        subject: process.env.VAPID_SUBJECT || 'mailto:no-reply@dawoodtechnextgen.com',
     },
 });
 //# sourceMappingURL=configuration.js.map

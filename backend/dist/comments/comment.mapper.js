@@ -1,3 +1,4 @@
+import { sameId } from '../common/same-id.js';
 export function toCommentResponse(comment, viewerId) {
     return {
         id: comment.id,
@@ -8,7 +9,8 @@ export function toCommentResponse(comment, viewerId) {
         authorAvatarUrl: comment.author?.avatarUrl ?? null,
         content: comment.content,
         createdAt: comment.createdAt.toISOString(),
-        isOwner: comment.userId === viewerId,
+        isOwner: sameId(comment.userId, viewerId),
+        accepted: comment.acceptedAt != null,
     };
 }
 //# sourceMappingURL=comment.mapper.js.map

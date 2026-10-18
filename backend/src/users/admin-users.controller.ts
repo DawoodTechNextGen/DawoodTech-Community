@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Param, Patch, UseGuards } from '@nestjs/common';
+import { Body, Controller, Get, Param, ParseIntPipe, Patch, UseGuards } from '@nestjs/common';
 import { CurrentUser } from '../common/decorators/current-user.decorator.js';
 import { Roles } from '../common/decorators/roles.decorator.js';
 import { RolesGuard } from '../common/guards/roles.guard.js';
@@ -23,21 +23,21 @@ export class AdminUsersController {
 
   @Patch(':id/status')
   async setStatus(
-    @Param('id') id: string,
+    @Param('id', ParseIntPipe) id: number,
     @Body() dto: UpdateUserStatusDto,
     @CurrentUser() admin: AuthenticatedUser,
   ) {
-    const user = await this.users.setStatus(Number(id), dto.status, admin.id);
+    const user = await this.users.setStatus(id, dto.status, admin.id);
     return toAdminUserResponse(user);
   }
 
   @Patch(':id/role')
   async setRole(
-    @Param('id') id: string,
+    @Param('id', ParseIntPipe) id: number,
     @Body() dto: UpdateUserRoleDto,
     @CurrentUser() admin: AuthenticatedUser,
   ) {
-    const user = await this.users.setRole(Number(id), dto.role, admin.id);
+    const user = await this.users.setRole(id, dto.role, admin.id);
     return toAdminUserResponse(user);
   }
 }

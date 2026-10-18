@@ -10,7 +10,7 @@ var __metadata = (this && this.__metadata) || function (k, v) {
 var __param = (this && this.__param) || function (paramIndex, decorator) {
     return function (target, key) { decorator(target, key, paramIndex); }
 };
-import { Controller, Delete, HttpCode, HttpStatus, Param } from '@nestjs/common';
+import { Controller, Delete, HttpCode, HttpStatus, Param, ParseIntPipe, Patch, } from '@nestjs/common';
 import { CurrentUser } from '../common/decorators/current-user.decorator.js';
 import { CommentsService } from './comments.service.js';
 let CommentsController = class CommentsController {
@@ -18,17 +18,28 @@ let CommentsController = class CommentsController {
     constructor(comments) {
         this.comments = comments;
     }
+    async accept(id, user) {
+        return this.comments.accept(id, user);
+    }
     async remove(id, user) {
-        await this.comments.remove(Number(id), user.id);
+        await this.comments.remove(id, user);
     }
 };
 __decorate([
-    Delete(':id'),
-    HttpCode(HttpStatus.NO_CONTENT),
-    __param(0, Param('id')),
+    Patch(':id/accept'),
+    __param(0, Param('id', ParseIntPipe)),
     __param(1, CurrentUser()),
     __metadata("design:type", Function),
-    __metadata("design:paramtypes", [String, Object]),
+    __metadata("design:paramtypes", [Number, Object]),
+    __metadata("design:returntype", Promise)
+], CommentsController.prototype, "accept", null);
+__decorate([
+    Delete(':id'),
+    HttpCode(HttpStatus.NO_CONTENT),
+    __param(0, Param('id', ParseIntPipe)),
+    __param(1, CurrentUser()),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", [Number, Object]),
     __metadata("design:returntype", Promise)
 ], CommentsController.prototype, "remove", null);
 CommentsController = __decorate([

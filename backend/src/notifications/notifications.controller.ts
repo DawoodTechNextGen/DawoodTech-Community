@@ -1,4 +1,13 @@
-import { Controller, Get, HttpCode, HttpStatus, Param, Patch, Query } from '@nestjs/common';
+import {
+  Controller,
+  Get,
+  HttpCode,
+  HttpStatus,
+  Param,
+  ParseIntPipe,
+  Patch,
+  Query,
+} from '@nestjs/common';
 import { CurrentUser } from '../common/decorators/current-user.decorator.js';
 import type { AuthenticatedUser } from '../auth/jwt.strategy.js';
 import { NotificationsService } from './notifications.service.js';
@@ -8,10 +17,7 @@ export class NotificationsController {
   constructor(private readonly notifications: NotificationsService) {}
 
   @Get()
-  async list(
-    @CurrentUser() user: AuthenticatedUser,
-    @Query('cursor') cursor?: string,
-  ) {
+  async list(@CurrentUser() user: AuthenticatedUser, @Query('cursor') cursor?: string) {
     return this.notifications.findForUser(user.id, cursor);
   }
 
@@ -23,11 +29,8 @@ export class NotificationsController {
 
   @Patch(':id/read')
   @HttpCode(HttpStatus.OK)
-  async markRead(
-    @Param('id') id: string,
-    @CurrentUser() user: AuthenticatedUser,
-  ) {
-    await this.notifications.markRead(Number(id), user.id);
+  async markRead(@Param('id', ParseIntPipe) id: number, @CurrentUser() user: AuthenticatedUser) {
+    await this.notifications.markRead(id, user.id);
     return { success: true };
   }
 

@@ -24,3 +24,6 @@ Thumbs.db
 .vscode/
 .idea/
 *.log
+
+# Local-only notes (test account passwords)
+*.local.md

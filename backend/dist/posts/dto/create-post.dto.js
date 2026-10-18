@@ -7,10 +7,13 @@ var __decorate = (this && this.__decorate) || function (decorators, target, key,
 var __metadata = (this && this.__metadata) || function (k, v) {
     if (typeof Reflect === "object" && typeof Reflect.metadata === "function") return Reflect.metadata(k, v);
 };
-import { IsArray, IsOptional, IsString, MaxLength, MinLength } from 'class-validator';
+import { ArrayMaxSize, IsArray, IsBoolean, IsOptional, IsString, Matches, MaxLength, MinLength, } from 'class-validator';
+import { MAX_POST_IMAGES, UPLOAD_URL_MESSAGE, UPLOAD_URL_PATTERN, } from '../../uploads/upload-url.js';
 export class CreatePostDto {
     content;
     mediaUrls;
+    answersPrompt;
+    isQuestion;
 }
 __decorate([
     IsString(),
@@ -21,7 +24,19 @@ __decorate([
 __decorate([
     IsOptional(),
     IsArray(),
+    ArrayMaxSize(MAX_POST_IMAGES),
     IsString({ each: true }),
+    Matches(UPLOAD_URL_PATTERN, { each: true, message: UPLOAD_URL_MESSAGE }),
     __metadata("design:type", Array)
 ], CreatePostDto.prototype, "mediaUrls", void 0);
+__decorate([
+    IsOptional(),
+    IsBoolean(),
+    __metadata("design:type", Boolean)
+], CreatePostDto.prototype, "answersPrompt", void 0);
+__decorate([
+    IsOptional(),
+    IsBoolean(),
+    __metadata("design:type", Boolean)
+], CreatePostDto.prototype, "isQuestion", void 0);
 //# sourceMappingURL=create-post.dto.js.map

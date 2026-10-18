@@ -5,8 +5,20 @@ export const NotificationEvents = {
   LikeCreated: 'like.created',
   PostApproved: 'post.approved',
   PostRejected: 'post.rejected',
-  /** Fired for every new comment (top-level or reply) — drives activity emails. */
-  CommentPosted: 'comment.posted',
+  /** A post entered or left the moderation queue — admins' live badge. */
+  PendingPostsChanged: 'posts.pending-changed',
+  /** Published text that may @mention people (an approved post, or a comment). */
+  MentionsPublished: 'mentions.published',
+  /** An admin pinned a post and asked for everyone to be told. */
+  AnnouncementPinned: 'announcement.pinned',
+  /** A question's author accepted someone's comment as the answer. */
+  AnswerAccepted: 'answer.accepted',
+  /** A post went into the review queue — admins get a push alert. */
+  PostSubmitted: 'post.submitted',
+  /** A member confirmed their email — their account is now usable. */
+  UserVerified: 'user.verified',
+  /** A member was blocked/unblocked or their role changed. */
+  UserAccessChanged: 'user.access-changed',
 } as const;
 
 export interface CommentCreatedEvent {
@@ -38,11 +50,34 @@ export interface PostReviewedEvent {
   adminId: number;
 }
 
-export interface CommentPostedEvent {
+export interface UserAccessChangedEvent {
+  userId: number;
+}
+
+export interface PostSubmittedEvent {
   postId: number;
-  commentId: number;
-  postOwnerId: number;
-  /** Author of the comment being replied to, or null for a top-level comment. */
-  parentCommentAuthorId: number | null;
+  authorId: number;
+}
+
+export interface UserVerifiedEvent {
+  userId: number;
+}
+
+export interface MentionsPublishedEvent {
+  postId: number;
+  actorId: number;
+  text: string;
+  /** Already notified about this (e.g. the post owner got a "comment"). */
+  skipUserIds: number[];
+}
+
+export interface AnnouncementPinnedEvent {
+  postId: number;
+  adminId: number;
+}
+
+export interface AnswerAcceptedEvent {
+  postId: number;
+  answerAuthorId: number;
   actorId: number;
 }

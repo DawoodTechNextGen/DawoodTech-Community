@@ -18,6 +18,9 @@ export var NotificationType;
     NotificationType["LIKE"] = "like";
     NotificationType["POST_APPROVED"] = "post_approved";
     NotificationType["POST_REJECTED"] = "post_rejected";
+    NotificationType["MENTION"] = "mention";
+    NotificationType["ANNOUNCEMENT"] = "announcement";
+    NotificationType["ANSWER_ACCEPTED"] = "answer_accepted";
 })(NotificationType || (NotificationType = {}));
 let Notification = class Notification {
     id;

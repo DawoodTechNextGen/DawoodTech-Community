@@ -9,5 +9,6 @@ export interface CommentResponse {
     content: string;
     createdAt: string;
     isOwner: boolean;
+    accepted: boolean;
 }
 export declare function toCommentResponse(comment: Comment, viewerId?: number): CommentResponse;

@@ -43,6 +43,10 @@ export class Comment {
   @JoinColumn({ name: 'parent_id' })
   parent!: Relation<Comment> | null;
 
+  /** Set when the question's author accepted this comment as the answer. */
+  @Column({ name: 'accepted_at', type: 'datetime', nullable: true })
+  acceptedAt!: Date | null;
+
   @CreateDateColumn({ name: 'created_at' })
   createdAt!: Date;
 }

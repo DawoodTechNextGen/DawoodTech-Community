@@ -1,4 +1,5 @@
 import type { Comment } from '../database/entities/comment.entity.js';
+import { sameId } from '../common/same-id.js';
 
 export interface CommentResponse {
   id: number;
@@ -10,12 +11,11 @@ export interface CommentResponse {
   content: string;
   createdAt: string;
   isOwner: boolean;
+  /** Accepted by the question's author as the answer. */
+  accepted: boolean;
 }
 
-export function toCommentResponse(
-  comment: Comment,
-  viewerId?: number,
-): CommentResponse {
+export function toCommentResponse(comment: Comment, viewerId?: number): CommentResponse {
   return {
     id: comment.id,
     postId: comment.postId,
@@ -25,6 +25,7 @@ export function toCommentResponse(
     authorAvatarUrl: comment.author?.avatarUrl ?? null,
     content: comment.content,
     createdAt: comment.createdAt.toISOString(),
-    isOwner: comment.userId === viewerId,
+    isOwner: sameId(comment.userId, viewerId),
+    accepted: comment.acceptedAt != null,
   };
 }

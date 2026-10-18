@@ -2,14 +2,10 @@
 
 import Image from "next/image";
 import Link from "next/link";
-import { useEffect, useState } from "react";
-import { api } from "@/lib/api-client";
-import { syncAppBadge } from "@/lib/app-badge";
 import { useAuth } from "@/lib/auth-context";
+import { useNotifications } from "@/lib/notifications-context";
 import { BottomNav } from "./bottom-nav";
 import { Sidebar } from "./sidebar";
-
-const POLL_INTERVAL_MS = 30_000;
 
 export function AppShell({
   children,
@@ -19,41 +15,8 @@ export function AppShell({
   rightRail?: React.ReactNode;
 }) {
   const { user } = useAuth();
-  const [unreadCount, setUnreadCount] = useState(0);
-  const [pendingCount, setPendingCount] = useState(0);
-  const isAdmin = user?.role === "admin";
-
-  useEffect(() => {
-    if (!user) return;
-
-    let cancelled = false;
-    async function poll() {
-      try {
-        const { count } = await api.getUnreadCount();
-        if (!cancelled) {
-          setUnreadCount(count);
-          syncAppBadge(count);
-        }
-      } catch {
-        // silent — the badge just won't update this cycle
-      }
-      if (isAdmin) {
-        try {
-          const pending = await api.getPendingPosts();
-          if (!cancelled) setPendingCount(pending.length);
-        } catch {
-          // silent — same as above
-        }
-      }
-    }
-
-    poll();
-    const interval = setInterval(poll, POLL_INTERVAL_MS);
-    return () => {
-      cancelled = true;
-      clearInterval(interval);
-    };
-  }, [user, isAdmin]);
+  // Both counts arrive live over the notifications socket.
+  const { unreadCount, pendingCount } = useNotifications();
 
   if (!user) return <>{children}</>;
 

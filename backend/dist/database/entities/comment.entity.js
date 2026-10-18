@@ -19,6 +19,7 @@ let Comment = class Comment {
     content;
     parentId;
     parent;
+    acceptedAt;
     createdAt;
 };
 __decorate([
@@ -59,6 +60,10 @@ __decorate([
     JoinColumn({ name: 'parent_id' }),
     __metadata("design:type", Object)
 ], Comment.prototype, "parent", void 0);
+__decorate([
+    Column({ name: 'accepted_at', type: 'datetime', nullable: true }),
+    __metadata("design:type", Object)
+], Comment.prototype, "acceptedAt", void 0);
 __decorate([
     CreateDateColumn({ name: 'created_at' }),
     __metadata("design:type", Date)

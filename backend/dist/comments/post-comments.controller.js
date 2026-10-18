@@ -10,7 +10,7 @@ var __metadata = (this && this.__metadata) || function (k, v) {
 var __param = (this && this.__param) || function (paramIndex, decorator) {
     return function (target, key) { decorator(target, key, paramIndex); }
 };
-import { Body, Controller, Get, Param, Post } from '@nestjs/common';
+import { Body, Controller, Get, Param, ParseIntPipe, Post } from '@nestjs/common';
 import { CurrentUser } from '../common/decorators/current-user.decorator.js';
 import { CommentsService } from './comments.service.js';
 import { CreateCommentDto } from './dto/create-comment.dto.js';
@@ -20,27 +20,27 @@ let PostCommentsController = class PostCommentsController {
         this.comments = comments;
     }
     async create(postId, user, dto) {
-        return this.comments.create(Number(postId), user.id, dto);
+        return this.comments.create(postId, user.id, dto);
     }
     async list(postId, user) {
-        return this.comments.findByPost(Number(postId), user.id);
+        return this.comments.findByPost(postId, user.id);
     }
 };
 __decorate([
     Post(),
-    __param(0, Param('postId')),
+    __param(0, Param('postId', ParseIntPipe)),
     __param(1, CurrentUser()),
     __param(2, Body()),
     __metadata("design:type", Function),
-    __metadata("design:paramtypes", [String, Object, CreateCommentDto]),
+    __metadata("design:paramtypes", [Number, Object, CreateCommentDto]),
     __metadata("design:returntype", Promise)
 ], PostCommentsController.prototype, "create", null);
 __decorate([
     Get(),
-    __param(0, Param('postId')),
+    __param(0, Param('postId', ParseIntPipe)),
     __param(1, CurrentUser()),
     __metadata("design:type", Function),
-    __metadata("design:paramtypes", [String, Object]),
+    __metadata("design:paramtypes", [Number, Object]),
     __metadata("design:returntype", Promise)
 ], PostCommentsController.prototype, "list", null);
 PostCommentsController = __decorate([

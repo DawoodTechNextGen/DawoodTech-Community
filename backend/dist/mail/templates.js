@@ -1,4 +1,6 @@
-function layout(title, bodyHtml, actionUrl, actionLabel) {
+import { escapeHtml } from './mail-utils.js';
+function layout(title, bodyHtml, link, actionLabel) {
+    const actionUrl = escapeHtml(link);
     return `
     <div style="font-family: -apple-system, Segoe UI, Roboto, sans-serif; max-width: 480px; margin: 0 auto; padding: 32px 24px;">
       <h2 style="color: #3d5afe; margin: 0 0 16px;">${title}</h2>
@@ -17,13 +19,13 @@ function layout(title, bodyHtml, actionUrl, actionLabel) {
 export function verifyEmailTemplate(fullName, link) {
     return {
         subject: 'Verify your DawoodTech Community email',
-        html: layout('Welcome to DawoodTech Community', `Hi ${fullName}, please confirm your email address to activate your account. This link expires in 1 hour.`, link, 'Verify email'),
+        html: layout('Welcome to DawoodTech Community', `Hi ${escapeHtml(fullName)}, please confirm your email address to activate your account. This link expires in 1 hour.`, link, 'Verify email'),
     };
 }
 export function resetPasswordTemplate(fullName, link) {
     return {
         subject: 'Reset your DawoodTech Community password',
-        html: layout('Reset your password', `Hi ${fullName}, we received a request to reset your password. This link expires in 1 hour. If you didn't request this, you can ignore this email.`, link, 'Reset password'),
+        html: layout('Reset your password', `Hi ${escapeHtml(fullName)}, we received a request to reset your password. This link expires in 1 hour. If you didn't request this, you can ignore this email.`, link, 'Reset password'),
     };
 }
 //# sourceMappingURL=templates.js.map

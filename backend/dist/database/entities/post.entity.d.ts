@@ -1,6 +1,7 @@
 import { type Relation } from 'typeorm';
 import { User } from './user.entity.js';
 import { PostMedia } from './post-media.entity.js';
+import { MilestoneKind } from './milestone.entity.js';
 export declare enum PostStatus {
     PENDING = "pending",
     APPROVED = "approved",
@@ -14,8 +15,11 @@ export declare class Post {
     status: PostStatus;
     reviewedBy: number | null;
     reviewedAt: Date | null;
-    notifyByEmail: boolean;
-    notifiedAt: Date | null;
+    promptDay: string | null;
+    promptText: string | null;
+    isQuestion: boolean;
+    pinnedAt: Date | null;
+    milestone: MilestoneKind | null;
     media: Relation<PostMedia>[];
     createdAt: Date;
     updatedAt: Date;

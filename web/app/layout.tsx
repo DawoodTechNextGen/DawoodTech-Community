@@ -2,6 +2,9 @@ import { Analytics } from "@vercel/analytics/next";
 import type { Metadata, Viewport } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import { AuthProvider } from "@/lib/auth-context";
+import { NotificationToast } from "@/components/notifications/notification-toast";
+import { NotificationsProvider } from "@/lib/notifications-context";
+import { LaunchSplash } from "@/components/pwa/launch-splash";
 import { RegisterServiceWorker } from "./register-service-worker";
 import "./globals.css";
 
@@ -22,7 +25,13 @@ export const metadata: Metadata = {
   manifest: "/manifest.json",
   icons: {
     icon: "/icons/icon-192.png",
-    apple: "/icons/icon-192.png",
+    apple: "/icons/apple-touch-icon.png",
+  },
+  // iOS: open full-screen from the home screen, under a translucent status bar.
+  appleWebApp: {
+    capable: true,
+    title: "DT Community",
+    statusBarStyle: "black-translucent",
   },
 };
 
@@ -37,7 +46,14 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
       className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
     >
       <body className="min-h-full flex flex-col">
-        <AuthProvider>{children}</AuthProvider>
+        <AuthProvider>
+          <LaunchSplash />
+          <NotificationsProvider>
+            {children}
+            {/* Here rather than in AppShell, so it survives page changes. */}
+            <NotificationToast />
+          </NotificationsProvider>
+        </AuthProvider>
         <RegisterServiceWorker />
         <Analytics />
       </body>

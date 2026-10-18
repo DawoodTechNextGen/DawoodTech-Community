@@ -10,6 +10,7 @@ import { CommentsModule } from '../comments/comments.module.js';
 import { FollowsModule } from '../follows/follows.module.js';
 import { LikesModule } from '../likes/likes.module.js';
 import { PostMedia } from '../database/entities/post-media.entity.js';
+import { PostTag } from '../database/entities/post-tag.entity.js';
 import { Post } from '../database/entities/post.entity.js';
 import { User } from '../database/entities/user.entity.js';
 import { AdminPostsController } from './admin-posts.controller.js';
@@ -20,7 +21,7 @@ let PostsModule = class PostsModule {
 PostsModule = __decorate([
     Module({
         imports: [
-            TypeOrmModule.forFeature([Post, PostMedia, User]),
+            TypeOrmModule.forFeature([Post, PostMedia, PostTag, User]),
             CommentsModule,
             FollowsModule,
             LikesModule,

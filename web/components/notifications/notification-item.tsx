@@ -1,4 +1,14 @@
-import { CheckCircle2, Heart, MessageCircle, Reply, UserPlus, XCircle } from "lucide-react";
+import {
+  AtSign,
+  BadgeCheck,
+  CheckCircle2,
+  Heart,
+  Megaphone,
+  MessageCircle,
+  Reply,
+  UserPlus,
+  XCircle,
+} from "lucide-react";
 import Link from "next/link";
 import { Avatar } from "@/components/ui/avatar";
 import { formatRelativeTime } from "@/lib/format";
@@ -11,6 +21,9 @@ const ICONS: Record<NotificationType, typeof Heart> = {
   like: Heart,
   post_approved: CheckCircle2,
   post_rejected: XCircle,
+  mention: AtSign,
+  announcement: Megaphone,
+  answer_accepted: BadgeCheck,
 };
 
 const ICON_COLORS: Record<NotificationType, string> = {
@@ -20,9 +33,12 @@ const ICON_COLORS: Record<NotificationType, string> = {
   like: "text-rose-500",
   post_approved: "text-emerald-500",
   post_rejected: "text-red-500",
+  mention: "text-brand",
+  announcement: "text-amber-500",
+  answer_accepted: "text-emerald-500",
 };
 
-function messageFor(n: Notification): string {
+export function messageFor(n: Notification): string {
   switch (n.type) {
     case "comment":
       return "commented on your post";
@@ -31,11 +47,17 @@ function messageFor(n: Notification): string {
     case "follow":
       return "started following you";
     case "like":
-      return "liked your post";
+      return "reacted to your post";
     case "post_approved":
       return "Your post was approved and is now live";
     case "post_rejected":
       return "Your post wasn't approved";
+    case "mention":
+      return "mentioned you";
+    case "announcement":
+      return "posted an announcement";
+    case "answer_accepted":
+      return "accepted your answer";
   }
 }
 

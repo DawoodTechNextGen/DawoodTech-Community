@@ -7,14 +7,23 @@ var __decorate = (this && this.__decorate) || function (decorators, target, key,
 var __metadata = (this && this.__metadata) || function (k, v) {
     if (typeof Reflect === "object" && typeof Reflect.metadata === "function") return Reflect.metadata(k, v);
 };
-import { CreateDateColumn, Entity, Index, JoinColumn, ManyToOne, PrimaryColumn, } from 'typeorm';
+import { Column, CreateDateColumn, Entity, Index, JoinColumn, ManyToOne, PrimaryColumn, } from 'typeorm';
 import { Post } from './post.entity.js';
 import { User } from './user.entity.js';
+export var Reaction;
+(function (Reaction) {
+    Reaction["LIKE"] = "like";
+    Reaction["CLAP"] = "clap";
+    Reaction["CELEBRATE"] = "celebrate";
+    Reaction["INSIGHTFUL"] = "insightful";
+    Reaction["FIRE"] = "fire";
+})(Reaction || (Reaction = {}));
 let Like = class Like {
     postId;
     post;
     userId;
     user;
+    reaction;
     createdAt;
 };
 __decorate([
@@ -36,6 +45,10 @@ __decorate([
     JoinColumn({ name: 'user_id' }),
     __metadata("design:type", Object)
 ], Like.prototype, "user", void 0);
+__decorate([
+    Column({ type: 'enum', enum: Reaction, default: Reaction.LIKE }),
+    __metadata("design:type", String)
+], Like.prototype, "reaction", void 0);
 __decorate([
     CreateDateColumn({ name: 'created_at' }),
     __metadata("design:type", Date)

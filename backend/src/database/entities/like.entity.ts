@@ -1,4 +1,5 @@
 import {
+  Column,
   CreateDateColumn,
   Entity,
   Index,
@@ -10,6 +11,15 @@ import {
 import { Post } from './post.entity.js';
 import { User } from './user.entity.js';
 
+export enum Reaction {
+  LIKE = 'like',
+  CLAP = 'clap',
+  CELEBRATE = 'celebrate',
+  INSIGHTFUL = 'insightful',
+  FIRE = 'fire',
+}
+
+/** One reaction per member per post (the table predates reactions, hence "likes"). */
 @Entity('likes')
 export class Like {
   @Index()
@@ -26,6 +36,9 @@ export class Like {
   @ManyToOne(() => User, { onDelete: 'CASCADE' })
   @JoinColumn({ name: 'user_id' })
   user!: Relation<User>;
+
+  @Column({ type: 'enum', enum: Reaction, default: Reaction.LIKE })
+  reaction!: Reaction;
 
   @CreateDateColumn({ name: 'created_at' })
   createdAt!: Date;

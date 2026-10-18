@@ -4,20 +4,23 @@ import { Inbox, ShieldCheck } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useState } from "react";
 import { AppShell } from "@/components/layout/app-shell";
-import { PostEmailStatsPanel } from "@/components/admin/post-email-stats";
 import { ReviewPostCard } from "@/components/admin/review-post-card";
 import { ErrorBanner } from "@/components/ui/error-banner";
 import { api } from "@/lib/api-client";
+import { formatWait } from "@/lib/format";
 import type { Post } from "@/lib/types";
+import { useNotifications } from "@/lib/notifications-context";
 import { useRequireAuth } from "@/lib/use-require-auth";
 
 export default function AdminReviewPage() {
   const { user, isLoading: authLoading } = useRequireAuth();
   const router = useRouter();
+  const { onPendingPostsChanged } = useNotifications();
 
   const [posts, setPosts] = useState<Post[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [avgWait, setAvgWait] = useState<number | null>(null);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -41,10 +44,30 @@ export default function AdminReviewPage() {
     if (user?.role === "admin") load();
   }, [user, load]);
 
-  async function handleApprove(post: Post, notifyInterns: boolean) {
+  useEffect(() => {
+    if (user?.role !== "admin") return;
+    api
+      .getReviewStats()
+      .then((s) => setAvgWait(s.avgWaitMinutes))
+      .catch(() => {});
+  }, [user]);
+
+  // Another admin reviewed something, or a new post came in — refetch quietly.
+  useEffect(
+    () =>
+      onPendingPostsChanged(() => {
+        api
+          .getPendingPosts()
+          .then(setPosts)
+          .catch(() => {});
+      }),
+    [onPendingPostsChanged],
+  );
+
+  async function handleApprove(post: Post) {
     setPosts((prev) => prev.filter((p) => p.id !== post.id));
     try {
-      await api.approvePost(post.id, notifyInterns);
+      await api.approvePost(post.id);
     } catch {
       setError("Couldn't approve that post.");
       load();
@@ -72,6 +95,14 @@ export default function AdminReviewPage() {
           {posts.length > 0 && (
             <span className="rounded-full bg-brand/10 px-2 py-0.5 text-xs font-medium text-brand">
               {posts.length} pending
+            </span>
+          )}
+          {avgWait !== null && (
+            <span
+              className="ml-auto text-xs text-foreground/50"
+              title="Average time from posting to an admin's decision, last 30 days"
+            >
+              Avg. wait: {formatWait(avgWait)}
             </span>
           )}
         </div>
@@ -118,8 +149,6 @@ export default function AdminReviewPage() {
             ))}
           </div>
         )}
-
-        <PostEmailStatsPanel />
       </div>
     </AppShell>
   );

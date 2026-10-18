@@ -7,7 +7,8 @@ var __decorate = (this && this.__decorate) || function (decorators, target, key,
 var __metadata = (this && this.__metadata) || function (k, v) {
     if (typeof Reflect === "object" && typeof Reflect.metadata === "function") return Reflect.metadata(k, v);
 };
-import { IsArray, IsOptional, IsString, MaxLength, MinLength } from 'class-validator';
+import { ArrayMaxSize, IsArray, IsOptional, IsString, Matches, MaxLength, MinLength, } from 'class-validator';
+import { MAX_POST_IMAGES, UPLOAD_URL_MESSAGE, UPLOAD_URL_PATTERN, } from '../../uploads/upload-url.js';
 export class UpdatePostDto {
     content;
     mediaUrls;
@@ -21,7 +22,9 @@ __decorate([
 __decorate([
     IsOptional(),
     IsArray(),
+    ArrayMaxSize(MAX_POST_IMAGES),
     IsString({ each: true }),
+    Matches(UPLOAD_URL_PATTERN, { each: true, message: UPLOAD_URL_MESSAGE }),
     __metadata("design:type", Array)
 ], UpdatePostDto.prototype, "mediaUrls", void 0);
 //# sourceMappingURL=update-post.dto.js.map

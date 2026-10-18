@@ -1,13 +1,17 @@
 import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
+import { EventEmitter2 } from '@nestjs/event-emitter';
 import { InjectRepository } from '@nestjs/typeorm';
 import { ILike, Repository } from 'typeorm';
 import { User, UserRole, UserStatus } from '../database/entities/user.entity.js';
+import { NotificationEvents } from '../notifications/notification.events.js';
 import type { UpdateProfileDto } from './dto/update-profile.dto.js';
+import { sameId } from '../common/same-id.js';
 
 @Injectable()
 export class UsersService {
   constructor(
     @InjectRepository(User) private readonly users: Repository<User>,
+    private readonly events: EventEmitter2,
   ) {}
 
   async findByIdOrFail(id: number): Promise<User> {
@@ -25,8 +29,8 @@ export class UsersService {
   async search(query: string): Promise<User[]> {
     return this.users.find({
       where: [
-        { username: ILike(`%${query}%`) },
-        { fullName: ILike(`%${query}%`) },
+        { username: ILike(`%${query}%`), status: UserStatus.ACTIVE },
+        { fullName: ILike(`%${query}%`), status: UserStatus.ACTIVE },
       ],
       take: 20,
     });
@@ -57,20 +61,24 @@ export class UsersService {
   }
 
   async setStatus(id: number, status: UserStatus, actingAdminId: number): Promise<User> {
-    if (id === actingAdminId) {
-      throw new BadRequestException('You can\'t change your own account status');
+    if (sameId(id, actingAdminId)) {
+      throw new BadRequestException("You can't change your own account status");
     }
     const user = await this.findByIdOrFail(id);
     user.status = status;
-    return this.users.save(user);
+    const saved = await this.users.save(user);
+    this.events.emit(NotificationEvents.UserAccessChanged, { userId: id });
+    return saved;
   }
 
   async setRole(id: number, role: UserRole, actingAdminId: number): Promise<User> {
-    if (id === actingAdminId) {
-      throw new BadRequestException('You can\'t change your own role');
+    if (sameId(id, actingAdminId)) {
+      throw new BadRequestException("You can't change your own role");
     }
     const user = await this.findByIdOrFail(id);
     user.role = role;
-    return this.users.save(user);
+    const saved = await this.users.save(user);
+    this.events.emit(NotificationEvents.UserAccessChanged, { userId: id });
+    return saved;
   }
 }

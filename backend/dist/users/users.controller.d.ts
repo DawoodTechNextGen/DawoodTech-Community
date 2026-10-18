@@ -10,8 +10,14 @@ export declare class UsersController {
     constructor(users: UsersService, posts: PostsService, follows: FollowsService);
     search(search?: string): Promise<import("./user.mapper.js").PublicUser[]>;
     suggestions(authUser: AuthenticatedUser): Promise<import("./user.mapper.js").PublicUser[]>;
-    updateMe(authUser: AuthenticatedUser, dto: UpdateProfileDto): Promise<import("./user.mapper.js").PublicUser>;
+    updateMe(authUser: AuthenticatedUser, dto: UpdateProfileDto): Promise<import("./user.mapper.js").SelfUser>;
     getByUsername(username: string): Promise<import("./user.mapper.js").PublicUser>;
-    getById(id: string): Promise<import("./user.mapper.js").PublicUser>;
-    getPostsByUser(id: string, authUser: AuthenticatedUser): Promise<import("../posts/post.mapper.js").PostResponse[]>;
+    progress(authUser: AuthenticatedUser): Promise<{
+        hasAvatar: boolean;
+        hasBio: boolean;
+        followingCount: number;
+        postCount: number;
+    }>;
+    getById(id: number): Promise<import("./user.mapper.js").PublicUser>;
+    getPostsByUser(id: number, authUser: AuthenticatedUser): Promise<import("../posts/post.mapper.js").PostResponse[]>;
 }
