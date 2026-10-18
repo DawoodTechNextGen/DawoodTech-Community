@@ -148,6 +148,11 @@ body::before {
   }
 }
 
+/* Already shown this session (a reload / pull-to-refresh): skip it. */
+html[data-splash-seen] .launch-splash {
+  display: none;
+}
+
 .launch-splash.is-leaving {
   opacity: 0;
   visibility: hidden;
@@ -256,5 +261,43 @@ body::before {
   .launch-splash {
     animation: none !important;
     transition-duration: 0.01ms !important;
+  }
+}
+
+/* --- Reload spinner (components/pwa/boot-spinner.tsx) --- */
+
+.boot-spinner {
+  position: fixed;
+  inset: 0;
+  z-index: 90;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  pointer-events: none;
+  animation: boot-spinner-in 0.2s 0.15s ease-out both;
+}
+
+.boot-spinner span {
+  width: 32px;
+  height: 32px;
+  border-radius: 9999px;
+  border: 3px solid color-mix(in srgb, var(--brand) 18%, transparent);
+  border-top-color: var(--brand);
+  animation: boot-spin 0.7s linear infinite;
+}
+
+@keyframes boot-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+/* A short delay, so fast loads never flash a spinner at all. */
+@keyframes boot-spinner-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
   }
 }
