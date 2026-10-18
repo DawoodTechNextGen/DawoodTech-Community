@@ -7,16 +7,17 @@ import type { PublicUser } from "./types";
 
 type Field = HTMLInputElement | HTMLTextAreaElement;
 
-/** "@ali" right before the caret → "ali". */
+/** "@ali" right before the caret → "ali"; a bare "@" → "". */
 function queryAtCaret(field: Field): string | null {
   const before = field.value.slice(0, field.selectionStart ?? field.value.length);
-  const match = /(?:^|[^\w@])@([a-zA-Z0-9_.]{1,50})$/.exec(before);
+  const match = /(?:^|[^\w@])@([a-zA-Z0-9_.]{0,50})$/.exec(before);
   return match ? match[1]! : null;
 }
 
 /**
- * @mention autocomplete for a text field: typing "@al" lists matching
- * members; ↑/↓ + Enter/Tab (or a click) inserts "@username ".
+ * @mention autocomplete for a text field. A bare "@" lists the people you
+ * follow, then suggested members; "@al" searches everyone. ↑/↓ + Enter/Tab
+ * (or a click) inserts "@username ".
  * Pass the field's ref; wire `onChange` and `onKeyDown` onto it, render `menu`.
  */
 export function useMentions<T extends Field>(
@@ -30,11 +31,19 @@ export function useMentions<T extends Field>(
   const [active, setActive] = useState(0);
 
   useEffect(() => {
-    if (!query) return;
+    if (query === null || !user) return;
     let cancelled = false;
     const timer = setTimeout(() => {
-      api
-        .searchUsers(query)
+      const lookup = query
+        ? api.searchUsers(query)
+        : Promise.all([
+            api.getFollowing(user.id).catch(() => []),
+            api.getSuggestedUsers().catch(() => []),
+          ]).then(([following, suggested]) => {
+            const seen = new Set(following.map((u) => u.id));
+            return [...following, ...suggested.filter((u) => !seen.has(u.id))];
+          });
+      lookup
         .then((users) => {
           if (cancelled) return;
           // Mentioning yourself notifies no one.
@@ -47,7 +56,7 @@ export function useMentions<T extends Field>(
       cancelled = true;
       clearTimeout(timer);
     };
-  }, [query, user?.id]);
+  }, [query, user]);
 
   const open = query !== null && options.length > 0;
 
@@ -74,7 +83,7 @@ export function useMentions<T extends Field>(
     onChange(e: React.ChangeEvent<T>) {
       setValue(e.target.value);
       const q = queryAtCaret(e.target);
-      if (q) setQuery(q);
+      if (q !== null) setQuery(q);
       else close();
     },
     onKeyDown(e: React.KeyboardEvent<T>) {
